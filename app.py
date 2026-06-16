@@ -347,10 +347,16 @@ st.caption(
 # Sidebar configuration
 # ==============================
 st.sidebar.header("Analysis settings")
-col_thr1, col_thr2 = st.sidebar.columns(2)
-threshold_1 = col_thr1.number_input("Threshold 1 (Å)", value=3.0, step=0.1, format="%.2f")
-threshold_2 = col_thr2.number_input("Threshold 2 (Å)", value=3.5, step=0.1, format="%.2f")
-thresholds = sorted({float(threshold_1), float(threshold_2)})
+col_min_dist, col_max_dist = st.sidebar.columns(2)
+minimum_distance = col_min_dist.number_input(
+    "Minimum distance (Å)", value=3.0, step=0.1, format="%.2f"
+)
+maximum_distance = col_max_dist.number_input(
+    "Maximum distance (Å)", value=3.5, step=0.1, format="%.2f"
+)
+distance_range_valid = float(minimum_distance) <= float(maximum_distance)
+if not distance_range_valid:
+    st.sidebar.error("Minimum distance must be less than or equal to maximum distance.")
 temperature = st.sidebar.number_input("Boltzmann temperature (K)", value=298.15, step=1.0)
 
 
@@ -841,6 +847,10 @@ if st.session_state.loaded and st.session_state.records:
     # ==============================
     st.header("5. Analysis")
     if st.button("Run distance analysis", type="primary"):
+        if not distance_range_valid:
+            st.error("Minimum distance must be less than or equal to maximum distance.")
+            st.stop()
+
         analysis_rows = []
         detail_rows = []
         skipped_messages = []
@@ -879,86 +889,87 @@ if st.session_state.loaded and st.session_state.records:
                     )
                     continue
 
-                for threshold in thresholds:
-                    criterion_pop_sums: Dict[str, float] = {}
-                    all_satisfied_pop = 0.0
+                criterion_pop_sums: Dict[str, float] = {}
+                all_satisfied_pop = 0.0
 
-                    for crit_label, a_label, b_label in active_criteria_rows:
-                        a_indices = candidate_mapping[a_label]
-                        b_indices = candidate_mapping[b_label]
-                        sat_pop = 0.0
-
-                        for rec in subset:
-                            if (
-                                not a_indices
-                                or not b_indices
-                                or max(a_indices) >= len(rec.atoms)
-                                or max(b_indices) >= len(rec.atoms)
-                            ):
-                                continue
-
-                            distance = min_between_groups(rec.coords, a_indices, b_indices)
-                            pop = rec.population if rec.population is not None else fallback_pop
-                            satisfies = distance <= threshold
-                            detail_rows.append(
-                                {
-                                    "group": group,
-                                    "candidate": candidate,
-                                    "conformer_id": rec.conformer_id,
-                                    "threshold_A": threshold,
-                                    "criterion": crit_label,
-                                    "mapping_A": a_label,
-                                    "mapping_B": b_label,
-                                    "distance_A": distance,
-                                    "population_percent": pop,
-                                    "satisfies": satisfies,
-                                }
-                            )
-                            if satisfies:
-                                sat_pop += pop
-
-                        criterion_pop_sums[crit_label] = sat_pop
+                for crit_label, a_label, b_label in active_criteria_rows:
+                    a_indices = candidate_mapping[a_label]
+                    b_indices = candidate_mapping[b_label]
+                    sat_pop = 0.0
 
                     for rec in subset:
-                        satisfied_all = True
-                        for _, a_label, b_label in active_criteria_rows:
-                            a_indices = candidate_mapping[a_label]
-                            b_indices = candidate_mapping[b_label]
-                            if (
-                                not a_indices
-                                or not b_indices
-                                or max(a_indices) >= len(rec.atoms)
-                                or max(b_indices) >= len(rec.atoms)
-                            ):
-                                satisfied_all = False
-                                break
-                            distance = min_between_groups(rec.coords, a_indices, b_indices)
-                            if distance > threshold:
-                                satisfied_all = False
-                                break
+                        if (
+                            not a_indices
+                            or not b_indices
+                            or max(a_indices) >= len(rec.atoms)
+                            or max(b_indices) >= len(rec.atoms)
+                        ):
+                            continue
 
-                        if satisfied_all:
-                            pop = rec.population if rec.population is not None else fallback_pop
-                            all_satisfied_pop += pop
+                        distance = min_between_groups(rec.coords, a_indices, b_indices)
+                        pop = rec.population if rec.population is not None else fallback_pop
+                        satisfies = float(minimum_distance) <= distance <= float(maximum_distance)
+                        detail_rows.append(
+                            {
+                                "group": group,
+                                "candidate": candidate,
+                                "conformer_id": rec.conformer_id,
+                                "minimum_distance_A": float(minimum_distance),
+                                "maximum_distance_A": float(maximum_distance),
+                                "criterion": crit_label,
+                                "mapping_A": a_label,
+                                "mapping_B": b_label,
+                                "distance_A": distance,
+                                "population_percent": pop,
+                                "satisfies": satisfies,
+                            }
+                        )
+                        if satisfies:
+                            sat_pop += pop
 
-                    result_row = {
-                        "group": group,
-                        "candidate": candidate,
-                        "threshold_A": threshold,
-                        "all_criteria_same_conformer_population_sum": all_satisfied_pop,
-                    }
-                    result_row.update(
-                        {f"population_sum::{name}": value for name, value in criterion_pop_sums.items()}
-                    )
-                    analysis_rows.append(result_row)
+                    criterion_pop_sums[crit_label] = sat_pop
+
+                for rec in subset:
+                    satisfied_all = True
+                    for _, a_label, b_label in active_criteria_rows:
+                        a_indices = candidate_mapping[a_label]
+                        b_indices = candidate_mapping[b_label]
+                        if (
+                            not a_indices
+                            or not b_indices
+                            or max(a_indices) >= len(rec.atoms)
+                            or max(b_indices) >= len(rec.atoms)
+                        ):
+                            satisfied_all = False
+                            break
+                        distance = min_between_groups(rec.coords, a_indices, b_indices)
+                        if not (float(minimum_distance) <= distance <= float(maximum_distance)):
+                            satisfied_all = False
+                            break
+
+                    if satisfied_all:
+                        pop = rec.population if rec.population is not None else fallback_pop
+                        all_satisfied_pop += pop
+
+                result_row = {
+                    "group": group,
+                    "candidate": candidate,
+                    "minimum_distance_A": float(minimum_distance),
+                    "maximum_distance_A": float(maximum_distance),
+                    "all_criteria_same_conformer_population_sum": all_satisfied_pop,
+                }
+                result_row.update(
+                    {f"population_sum::{name}": value for name, value in criterion_pop_sums.items()}
+                )
+                analysis_rows.append(result_row)
 
             if skipped_messages:
                 st.warning("Some candidates were skipped:\n\n" + "\n\n".join(skipped_messages))
 
             if analysis_rows:
                 result_df = pd.DataFrame(analysis_rows).sort_values(
-                    by=["threshold_A", "all_criteria_same_conformer_population_sum"],
-                    ascending=[True, False],
+                    by=["all_criteria_same_conformer_population_sum"],
+                    ascending=[False],
                 )
                 detail_df = pd.DataFrame(detail_rows)
 
