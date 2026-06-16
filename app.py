@@ -286,25 +286,67 @@ if input_mode == "SDF ensemble":
 
 else:
     st.subheader("Upload Gaussian log files")
-    st.write("Upload multiple Gaussian log files and assign each file to a group and candidate.")
+    st.write("Upload multiple Gaussian log files and organize them into candidate groups. Each group can be renamed.")
     log_files = st.file_uploader("Gaussian log files", type=["log", "out"], accept_multiple_files=True)
-    default_group = st.text_input("Default group name", value="default_group_logs")
 
     if log_files:
-        mapping_df = pd.DataFrame(
-            [{"file_name": f.name, "group": default_group, "candidate": "candidate_1"} for f in log_files]
-        )
-        edited = st.data_editor(mapping_df, num_rows="dynamic", use_container_width=True, key="log_map")
+        st.markdown("#### Group Gaussian logs")
+        n_groups = st.number_input("Number of groups", min_value=1, max_value=12, value=2, step=1)
+        group_assignments = []
+        file_names = [f.name for f in log_files]
+
+        for i in range(int(n_groups)):
+            with st.container(border=True):
+                st.markdown(f"**Group {i+1}**")
+                default_group_name = f"Group {i+1}"
+                group_name = st.text_input(
+                    f"Group {i+1} name",
+                    value=default_group_name,
+                    key=f"group_name_{i}"
+                )
+                default_candidate_name = f"candidate_{i+1}"
+                candidate_name = st.text_input(
+                    f"Group {i+1} candidate label",
+                    value=default_candidate_name,
+                    key=f"candidate_name_{i}"
+                )
+                selected_files = st.multiselect(
+                    f"Files for Group {i+1}",
+                    options=file_names,
+                    default=[],
+                    key=f"group_files_{i}"
+                )
+                for fn in selected_files:
+                    group_assignments.append({
+                        "file_name": fn,
+                        "group": group_name,
+                        "candidate": candidate_name,
+                    })
+
+        if group_assignments:
+            assign_df = pd.DataFrame(group_assignments).drop_duplicates(subset=["file_name"], keep="last")
+            st.markdown("#### Current assignments")
+            st.dataframe(assign_df, use_container_width=True)
+        else:
+            assign_df = pd.DataFrame(columns=["file_name", "group", "candidate"])
+
+        unassigned = [fn for fn in file_names if fn not in set(assign_df["file_name"].tolist())]
+        if unassigned:
+            st.warning(f"Unassigned files: {', '.join(unassigned)}")
+
         if st.button("Load Gaussian log files"):
-            all_records = []
-            for f in log_files:
-                row = edited.loc[edited["file_name"] == f.name].iloc[0]
-                rec = parse_gaussian_log(f, str(row["group"]), str(row["candidate"]))
-                all_records.append(rec)
-            all_records = compute_boltzmann_populations(all_records, temperature=temperature)
-            st.session_state.records = all_records
-            st.session_state.loaded = True
-            st.success(f"Loaded {len(all_records)} conformers from {len(log_files)} Gaussian log file(s).")
+            if unassigned:
+                st.error("Please assign all uploaded Gaussian log files to a group before loading.")
+            else:
+                all_records = []
+                for f in log_files:
+                    row = assign_df.loc[assign_df["file_name"] == f.name].iloc[0]
+                    rec = parse_gaussian_log(f, str(row["group"]), str(row["candidate"]))
+                    all_records.append(rec)
+                all_records = compute_boltzmann_populations(all_records, temperature=temperature)
+                st.session_state.records = all_records
+                st.session_state.loaded = True
+                st.success(f"Loaded {len(all_records)} conformers from {len(log_files)} Gaussian log file(s).")
 
 
 # ==============================
