@@ -28,7 +28,7 @@ class ConformerRecord:
     candidate: str
     conformer_id: str
     atoms: List[str]
-    coords: np.ndarray
+    coords: np.ndarray  # shape (n_atoms, 3)
     energy: Optional[float] = None
     free_energy: Optional[float] = None
     population: Optional[float] = None
@@ -86,7 +86,7 @@ def _parse_gaussian_energies(text: str) -> Tuple[Optional[float], Optional[float
 def _atomic_number_to_symbol(z: int) -> str:
     periodic = {
         1: "H", 5: "B", 6: "C", 7: "N", 8: "O", 9: "F", 14: "Si", 15: "P",
-        16: "S", 17: "Cl", 35: "Br", 53: "I",
+        16: "S", 17: "Cl", 35: "Br", 53: "I"
     }
     return periodic.get(z, f"Z{z}")
 
@@ -117,6 +117,7 @@ def parse_sdf_ensemble(uploaded_file, group: str, candidate: str) -> List[Confor
     if Chem is None:
         raise ImportError("RDKit is required to parse SDF files. Add rdkit to your environment.")
 
+    content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
     supplier = Chem.ForwardSDMolSupplier(io.BytesIO(uploaded_file.getvalue()), removeHs=False)
 
     records: List[ConformerRecord] = []
@@ -125,13 +126,10 @@ def parse_sdf_ensemble(uploaded_file, group: str, candidate: str) -> List[Confor
             continue
         conf = mol.GetConformer()
         atoms = [atom.GetSymbol() for atom in mol.GetAtoms()]
-        coords = np.array(
-            [
-                [conf.GetAtomPosition(i).x, conf.GetAtomPosition(i).y, conf.GetAtomPosition(i).z]
-                for i in range(mol.GetNumAtoms())
-            ],
-            dtype=float,
-        )
+        coords = np.array([
+            [conf.GetAtomPosition(i).x, conf.GetAtomPosition(i).y, conf.GetAtomPosition(i).z]
+            for i in range(mol.GetNumAtoms())
+        ], dtype=float)
 
         props = mol.GetPropsAsDict()
         population = None
@@ -174,10 +172,7 @@ def hartree_to_kcal(delta_hartree: float) -> float:
     return delta_hartree * 627.509474
 
 
-def compute_boltzmann_populations(
-    records: List[ConformerRecord],
-    temperature: float = 298.15,
-) -> List[ConformerRecord]:
+def compute_boltzmann_populations(records: List[ConformerRecord], temperature: float = 298.15) -> List[ConformerRecord]:
     grouped: Dict[Tuple[str, str], List[ConformerRecord]] = {}
     for rec in records:
         grouped.setdefault((rec.group, rec.candidate), []).append(rec)
@@ -186,7 +181,6 @@ def compute_boltzmann_populations(
     for _, recs in grouped.items():
         values: List[Optional[float]] = []
         mode = None
-
         for rec in recs:
             if rec.free_energy is not None:
                 values.append(rec.free_energy)
@@ -209,16 +203,14 @@ def compute_boltzmann_populations(
         deltas = [hartree_to_kcal(float(v) - min_e) for v in values if v is not None]
         weights = [math.exp(-d / (r_kcal * temperature)) for d in deltas]
         denom = sum(weights)
-
         for rec, w in zip(recs, weights):
             rec.population = 100.0 * w / denom
             rec.metadata["population_mode"] = mode or "unknown"
-
     return records
 
 
 # ==============================
-# Distance analysis helpers
+# Distance analysis
 # ==============================
 def atom_index_from_user_number(user_number: int) -> int:
     return user_number - 1
@@ -235,7 +227,7 @@ def min_group_distance(coords: np.ndarray, idx_a: int, idx_group: List[int]) -> 
 # ==============================
 # App state helpers
 # ==============================
-def init_state() -> None:
+def init_state():
     defaults = {
         "records": [],
         "loaded": False,
@@ -248,10 +240,7 @@ def init_state() -> None:
 init_state()
 
 st.title("Conformer Distance Analyzer")
-st.caption(
-    "Streamlit tool for comparing conformer ensembles from SDF or Gaussian log files "
-    "using user-defined H···H distance criteria and conformer populations."
-)
+st.caption("Streamlit tool for comparing conformer ensembles from SDF or Gaussian log files using user-defined H···H distance criteria and conformer populations.")
 
 
 # ==============================
@@ -289,25 +278,19 @@ if input_mode == "SDF ensemble":
             ]
         )
         edited = st.data_editor(mapping_df, num_rows="dynamic", use_container_width=True, key="sdf_map")
-
         if st.button("Load SDF ensembles"):
             all_records: List[ConformerRecord] = []
             for f in sdf_files:
                 row = edited.loc[edited["file_name"] == f.name].iloc[0]
                 recs = parse_sdf_ensemble(f, str(row["group"]), str(row["candidate"]))
                 all_records.extend(recs)
-
             all_records = compute_boltzmann_populations(all_records, temperature=temperature)
             st.session_state.records = all_records
             st.session_state.loaded = True
             st.success(f"Loaded {len(all_records)} conformers from {len(sdf_files)} SDF file(s).")
-
 else:
     st.subheader("Upload Gaussian log files")
-    st.write(
-        "Upload Gaussian log files in groups. After files are added to one group, "
-        "a new upload area appears for the next group."
-    )
+    st.write("Upload Gaussian log files in groups. After files are added to one group, a new upload area appears for the next group.")
 
     if "gaussian_group_count" not in st.session_state:
         st.session_state.gaussian_group_count = 1
@@ -323,7 +306,6 @@ else:
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
                 key=f"gaussian_group_name_{i}",
             )
-
             files = st.file_uploader(
                 f"Gaussian log files for Group {i+1}",
                 type=["log", "out"],
@@ -371,13 +353,11 @@ else:
                     rec = parse_gaussian_log(f, g["group"], g["candidate"])
                     all_records.append(rec)
                     total_files += 1
-
             all_records = compute_boltzmann_populations(all_records, temperature=temperature)
             st.session_state.records = all_records
             st.session_state.loaded = True
             st.success(
-                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) "
-                f"across {len(populated_groups)} group(s)."
+                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) across {len(populated_groups)} group(s)."
             )
 
 
@@ -387,21 +367,19 @@ else:
 if st.session_state.loaded and st.session_state.records:
     st.header("2. Loaded conformers")
     recs = st.session_state.records
-    summary_df = pd.DataFrame(
-        [
-            {
-                "group": r.group,
-                "candidate": r.candidate,
-                "source": r.source_name,
-                "conformer_id": r.conformer_id,
-                "n_atoms": len(r.atoms),
-                "energy": r.energy,
-                "free_energy": r.free_energy,
-                "population": r.population,
-            }
-            for r in recs
-        ]
-    )
+    summary_df = pd.DataFrame([
+        {
+            "group": r.group,
+            "candidate": r.candidate,
+            "source": r.source_name,
+            "conformer_id": r.conformer_id,
+            "n_atoms": len(r.atoms),
+            "energy": r.energy,
+            "free_energy": r.free_energy,
+            "population": r.population,
+        }
+        for r in recs
+    ])
     st.dataframe(summary_df, use_container_width=True, height=280)
 
     st.header("3. Atom mapping")
@@ -413,18 +391,11 @@ if st.session_state.loaded and st.session_state.records:
     example = candidate_records[0]
 
     st.write("Enter atom labels and 1-based atom numbers. Use comma-separated values for interchangeable proton groups.")
-    atom_table = pd.DataFrame(
-        {
-            "label": ["H3", "H4", "H3pp", "H4pp", "H2p_or_H6p", "H2ppp_or_H6ppp", "H5pp"],
-            "atom_numbers": ["", "", "", "", "", "", ""],
-        }
-    )
-    atom_table = st.data_editor(
-        atom_table,
-        num_rows="dynamic",
-        use_container_width=True,
-        key=f"mapping_{selected_candidate}",
-    )
+    atom_table = pd.DataFrame({
+        "label": ["H3", "H4", "H3pp", "H4pp", "H2p_or_H6p", "H2ppp_or_H6ppp", "H5pp"],
+        "atom_numbers": ["", "", "", "", "", "", ""],
+    })
+    atom_table = st.data_editor(atom_table, num_rows="dynamic", use_container_width=True, key=f"mapping_{selected_candidate}")
 
     mapping: Dict[str, List[int]] = {}
     for _, row in atom_table.iterrows():
@@ -435,29 +406,20 @@ if st.session_state.loaded and st.session_state.records:
             mapping[label] = nums
 
     with st.expander("Show atom list for selected candidate"):
-        atom_df = pd.DataFrame(
-            {
-                "atom_number_1_based": list(range(1, len(example.atoms) + 1)),
-                "element": example.atoms,
-            }
-        )
+        atom_df = pd.DataFrame({
+            "atom_number_1_based": list(range(1, len(example.atoms) + 1)),
+            "element": example.atoms,
+        })
         st.dataframe(atom_df, use_container_width=True, height=240)
 
     st.header("4. Distance criteria")
     st.write("Define criteria as either pair distances or group-min distances.")
-    criteria_df = pd.DataFrame(
-        {
-            "label": ["NOE1", "NOE2"],
-            "atom_a_label": ["H3", "H3"],
-            "atom_b_label_or_group": ["H2ppp_or_H6ppp", "H2p_or_H6p"],
-        }
-    )
-    criteria_df = st.data_editor(
-        criteria_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key=f"criteria_{selected_candidate}",
-    )
+    criteria_df = pd.DataFrame({
+        "label": ["NOE1", "NOE2"],
+        "atom_a_label": ["H3", "H3"],
+        "atom_b_label_or_group": ["H2ppp_or_H6ppp", "H2p_or_H6p"],
+    })
+    criteria_df = st.data_editor(criteria_df, num_rows="dynamic", use_container_width=True, key=f"criteria_{selected_candidate}")
 
     st.header("5. Analysis")
     if st.button("Run distance analysis"):
@@ -485,30 +447,23 @@ if st.session_state.loaded and st.session_state.records:
                     a_idx = mapping[a_label][0]
                     b_idxs = mapping[b_label]
                     sat_pop = 0.0
-
                     for rec in subset:
                         if a_idx >= len(rec.atoms) or max(b_idxs) >= len(rec.atoms):
                             continue
-
                         d = min_group_distance(rec.coords, a_idx, b_idxs)
                         pop = rec.population if rec.population is not None else fallback_pop
-
-                        detail_rows.append(
-                            {
-                                "group": group,
-                                "candidate": cand,
-                                "conformer_id": rec.conformer_id,
-                                "threshold": thr,
-                                "criterion": crit_label,
-                                "distance": d,
-                                "population": pop,
-                                "satisfies": d <= thr,
-                            }
-                        )
-
+                        detail_rows.append({
+                            "group": group,
+                            "candidate": cand,
+                            "conformer_id": rec.conformer_id,
+                            "threshold": thr,
+                            "criterion": crit_label,
+                            "distance": d,
+                            "population": pop,
+                            "satisfies": d <= thr,
+                        })
                         if d <= thr:
                             sat_pop += pop
-
                     criterion_pop_sums[crit_label] = sat_pop
 
                 active_criteria = []
@@ -529,7 +484,6 @@ if st.session_state.loaded and st.session_state.records:
                         if d > thr:
                             satisfied_all = False
                             break
-
                     if satisfied_all:
                         pop = rec.population if rec.population is not None else fallback_pop
                         all_satisfied_pop += pop
@@ -558,25 +512,11 @@ if st.session_state.loaded and st.session_state.records:
 
             csv_result = result_df.to_csv(index=False).encode("utf-8")
             csv_detail = detail_df.to_csv(index=False).encode("utf-8")
-
-            st.download_button(
-                "Download candidate comparison CSV",
-                csv_result,
-                "candidate_comparison.csv",
-                "text/csv",
-            )
-            st.download_button(
-                "Download per-conformer detail CSV",
-                csv_detail,
-                "per_conformer_detail.csv",
-                "text/csv",
-            )
+            st.download_button("Download candidate comparison CSV", csv_result, "candidate_comparison.csv", "text/csv")
+            st.download_button("Download per-conformer detail CSV", csv_detail, "per_conformer_detail.csv", "text/csv")
         else:
             st.warning("No analysis rows were generated. Check atom mapping and criteria.")
 
 
 st.markdown("---")
-st.caption(
-    "Tips: Use Gaussian logs when you want populations computed from energies/free energies. "
-    "Use SDF when population values already come from conformer search software such as CONFLEX."
-)
+st.caption("Tips: Use Gaussian logs when you want populations computed from energies/free energies. Use SDF when population values already come from conformer search software such as CONFLEX.")
