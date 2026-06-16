@@ -188,9 +188,12 @@ def compute_boltzmann_populations(records: List[ConformerRecord], temperature: f
             elif rec.energy is not None:
                 values.append(rec.energy)
                 mode = "energy"
-            else:
+           else:
     st.subheader("Upload Gaussian log files")
-    st.write("Upload Gaussian log files in groups. After files are added to one group, a new upload area appears for the next group.")
+    st.write(
+        "Upload Gaussian log files in groups. After files are added to one group, "
+        "a new upload area appears for the next group."
+    )
 
     if "gaussian_group_count" not in st.session_state:
         st.session_state.gaussian_group_count = 1
@@ -206,6 +209,7 @@ def compute_boltzmann_populations(records: List[ConformerRecord], temperature: f
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
                 key=f"gaussian_group_name_{i}",
             )
+
             files = st.file_uploader(
                 f"Gaussian log files for Group {i+1}",
                 type=["log", "out"],
@@ -229,6 +233,7 @@ def compute_boltzmann_populations(records: List[ConformerRecord], temperature: f
             st.rerun()
 
     populated_groups = [g for g in group_specs if g["files"]]
+
     if populated_groups:
         summary_rows = []
         for g in populated_groups:
@@ -254,11 +259,13 @@ def compute_boltzmann_populations(records: List[ConformerRecord], temperature: f
                     rec = parse_gaussian_log(f, g["group"], g["candidate"])
                     all_records.append(rec)
                     total_files += 1
+
             all_records = compute_boltzmann_populations(all_records, temperature=temperature)
             st.session_state.records = all_records
             st.session_state.loaded = True
             st.success(
-                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) across {len(populated_groups)} group(s)."
+                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) "
+                f"across {len(populated_groups)} group(s)."
             )
 
 
