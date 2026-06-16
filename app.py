@@ -21,7 +21,7 @@ except Exception:
 st.set_page_config(page_title="Conformer Distance Analyzer", layout="wide")
 
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 PROJECT_FORMAT_VERSION = 1
 
 TEXTS = {
@@ -42,6 +42,14 @@ TEXTS = {
         "distance_error": "最小距離は最大距離以下にしてください。",
         "distance_note": "NOE／ROE解析では通常、最小距離を0 Åとし、最大距離を設定します。",
         "temperature": "ボルツマン温度（K）",
+        "population_energy_source": "存在比計算に使用するエネルギー",
+        "energy_source_automatic": "自動選択",
+        "energy_source_electronic": "電子エネルギー",
+        "energy_source_gibbs": "Gibbs自由エネルギー",
+        "population_energy_help": "Gaussian logでは、電子エネルギーまたはGibbs自由エネルギーを選択できます。Gibbs自由エネルギーを使用するには、全配座のlogに振動数計算結果が必要です。自動選択では、全logにGibbs自由エネルギーがあればそれを使用し、なければ電子エネルギーを使用します。",
+        "missing_electronic": "次のGaussian logから電子エネルギーを取得できませんでした：{files}",
+        "missing_gibbs": "次のGaussian logからGibbs自由エネルギーを取得できませんでした：{files}。全配座について振動数計算を行うか、電子エネルギーを選択してください。",
+        "missing_automatic": "Gaussian logから一貫したエネルギーセットを取得できませんでした。全logに電子エネルギー、または全logにGibbs自由エネルギーが含まれていることを確認してください。",
         "input_source": "1. 入力ファイル",
         "choose_input": "入力形式を選択",
         "sdf_ensemble": "SDF配座集団",
@@ -136,13 +144,21 @@ TEXTS = {
         "download_project": "現在のプロジェクトをダウンロード",
         "project_contents": ".cda.zipファイルには、座標、存在比、マッピング、距離条件、設定、および直近の解析結果が含まれます。",
         "prepare_project_error": "プロジェクトファイルを作成できませんでした：{error}",
-        "footer_tip": "ヒント：電子エネルギー／自由エネルギーから存在比を計算する場合はGaussian logを使用します。配座存在比または配座探索エネルギーが保存されている場合はSDFを使用します。",
+        "footer_tip": "ヒント：SDF解析では、ファイル内に保存された配座存在比または配座探索エネルギーを利用します。Gaussian log解析では電子エネルギーを使用し、全配座について振動数計算結果がある場合はGibbs自由エネルギーも選択できます。",
         "version_line": "バージョン {app_version}｜プロジェクト形式 v{project_version}",
         "author_line": "作成者：Ken-ichi Nakashima（愛知学院大学薬学部 薬用資源学講座）",
         "col_file": "ファイル名", "col_group": "グループ", "col_candidate": "候補",
         "col_source": "元ファイル", "col_conformer": "配座ID", "col_atoms": "原子数",
         "col_energy": "エネルギー", "col_free_energy": "自由エネルギー", "col_population": "存在比（%）",
-        "col_population_mode": "存在比の算出法", "col_registered": "登録ラベル数", "col_labels": "ラベル",
+        "col_population_mode": "存在比の算出法",
+        "mode_supplied_population": "SDF内の存在比",
+        "mode_sdf_energy": "SDF内の配座探索エネルギー",
+        "mode_sdf_free_energy": "SDF内の自由エネルギー",
+        "mode_electronic_energy": "電子エネルギー",
+        "mode_gibbs_free_energy": "Gibbs自由エネルギー",
+        "mode_equal_weight": "等分配",
+        "mode_unknown": "不明",
+        "col_registered": "登録ラベル数", "col_labels": "ラベル",
         "col_criterion": "距離条件", "col_a": "プロトン／グループA", "col_b": "プロトン／グループB",
         "col_min": "最小距離（Å）", "col_max": "最大距離（Å）", "col_distance": "距離（Å）",
         "col_satisfies": "条件適合", "col_all_sum": "全条件を同一配座で満たす存在比合計（%）",
@@ -165,6 +181,14 @@ TEXTS = {
         "distance_error": "Minimum distance must be less than or equal to maximum distance.",
         "distance_note": "For NOE/ROE analysis, the minimum distance is normally set to 0 Å and an upper distance cutoff is applied.",
         "temperature": "Boltzmann temperature (K)",
+        "population_energy_source": "Energy used for population calculation",
+        "energy_source_automatic": "Automatic",
+        "energy_source_electronic": "Electronic energy",
+        "energy_source_gibbs": "Gibbs free energy",
+        "population_energy_help": "For Gaussian log files, choose electronic or Gibbs free energy. Gibbs free energy requires frequency results for every conformer. Automatic uses Gibbs free energy when it is available for all logs; otherwise, it uses electronic energy.",
+        "missing_electronic": "Electronic energy could not be obtained from the following Gaussian log file(s): {files}",
+        "missing_gibbs": "Gibbs free energy could not be obtained from the following Gaussian log file(s): {files}. Run frequency calculations for all conformers or select electronic energy.",
+        "missing_automatic": "A consistent energy set could not be obtained from the Gaussian log files. Ensure that all logs contain electronic energies or that all logs contain Gibbs free energies.",
         "input_source": "1. Input source",
         "choose_input": "Choose input type",
         "sdf_ensemble": "SDF ensemble",
@@ -259,13 +283,21 @@ TEXTS = {
         "download_project": "Download current project",
         "project_contents": "The .cda.zip file contains coordinates, populations, mappings, criteria, settings, and the most recent analysis results.",
         "prepare_project_error": "Could not prepare the project file: {error}",
-        "footer_tip": "Tips: Use Gaussian logs when populations should be computed from electronic/free energies. Use SDF when conformer populations or conformer-search energies are stored in the file.",
+        "footer_tip": "Tip: SDF analysis uses conformer populations or conformational-search energies stored in the file. Gaussian log analysis uses electronic energies; when frequency results are available for all conformers, Gibbs free energies can also be selected.",
         "version_line": "Version {app_version} | Project format v{project_version}",
-        "author_line": "Developed by Ken-ichi Nakashima (Laboratory of Pharmacognosy, School of Pharmacy, Aichi Gakuin University)",
+        "author_line": "Developed by Ken-ichi Nakashima (Laboratory of Medicinal Resources, School of Pharmacy, Aichi Gakuin University)",
         "col_file": "File name", "col_group": "Group", "col_candidate": "Candidate",
         "col_source": "Source", "col_conformer": "Conformer ID", "col_atoms": "Number of atoms",
         "col_energy": "Energy", "col_free_energy": "Free energy", "col_population": "Population (%)",
-        "col_population_mode": "Population mode", "col_registered": "Registered labels", "col_labels": "Labels",
+        "col_population_mode": "Population mode",
+        "mode_supplied_population": "Population stored in SDF",
+        "mode_sdf_energy": "Conformational-search energy in SDF",
+        "mode_sdf_free_energy": "Free energy in SDF",
+        "mode_electronic_energy": "Electronic energy",
+        "mode_gibbs_free_energy": "Gibbs free energy",
+        "mode_equal_weight": "Equal weighting",
+        "mode_unknown": "Unknown",
+        "col_registered": "Registered labels", "col_labels": "Labels",
         "col_criterion": "Criterion", "col_a": "Proton/group A", "col_b": "Proton/group B",
         "col_min": "Minimum distance (Å)", "col_max": "Maximum distance (Å)", "col_distance": "Distance (Å)",
         "col_satisfies": "Satisfies", "col_all_sum": "Population sum satisfying all criteria in the same conformer (%)",
@@ -274,10 +306,10 @@ TEXTS = {
 }
 
 def current_language() -> str:
-    return st.session_state.get("language", "ja")
+    return st.session_state.get("language", "en")
 
 def t(key: str, **kwargs) -> str:
-    text = TEXTS.get(current_language(), TEXTS["ja"]).get(key, key)
+    text = TEXTS.get(current_language(), TEXTS["en"]).get(key, key)
     return text.format(**kwargs) if kwargs else text
 
 
@@ -481,10 +513,53 @@ def hartree_to_kcal(delta_hartree: float) -> float:
     return delta_hartree * 627.509474
 
 
+class PopulationEnergyError(ValueError):
+    def __init__(self, code: str, files: Optional[List[str]] = None):
+        super().__init__(code)
+        self.code = code
+        self.files = files or []
+
+
+def resolve_gaussian_energy_source(
+    records: List[ConformerRecord],
+    requested_source: str,
+) -> Optional[str]:
+    gaussian_records = [rec for rec in records if rec.source_type == "gaussian_log"]
+    if not gaussian_records:
+        return None
+
+    missing_electronic = [rec.source_name for rec in gaussian_records if rec.energy is None]
+    missing_gibbs = [rec.source_name for rec in gaussian_records if rec.free_energy is None]
+
+    if requested_source == "electronic":
+        if missing_electronic:
+            raise PopulationEnergyError("missing_electronic", sorted(set(missing_electronic)))
+        return "electronic"
+
+    if requested_source == "gibbs":
+        if missing_gibbs:
+            raise PopulationEnergyError("missing_gibbs", sorted(set(missing_gibbs)))
+        return "gibbs"
+
+    if requested_source == "automatic":
+        if not missing_gibbs:
+            return "gibbs"
+        if not missing_electronic:
+            return "electronic"
+        raise PopulationEnergyError("missing_automatic")
+
+    raise ValueError(f"Unsupported Gaussian energy source: {requested_source}")
+
+
 def compute_boltzmann_populations(
     records: List[ConformerRecord],
     temperature: float = 298.15,
+    gaussian_energy_source: str = "automatic",
 ) -> List[ConformerRecord]:
+    resolved_gaussian_source = resolve_gaussian_energy_source(
+        records, gaussian_energy_source
+    )
+
     grouped: Dict[Tuple[str, str], List[ConformerRecord]] = {}
     for rec in records:
         grouped.setdefault((rec.group, rec.candidate), []).append(rec)
@@ -492,7 +567,9 @@ def compute_boltzmann_populations(
     r_kcal = 0.0019872041
     for _, recs in grouped.items():
         # Preserve populations already supplied by the SDF when all are available.
-        if all(rec.population is not None for rec in recs):
+        if all(rec.source_type == "sdf" for rec in recs) and all(
+            rec.population is not None for rec in recs
+        ):
             total = sum(float(rec.population) for rec in recs)
             if total > 0:
                 for rec in recs:
@@ -500,39 +577,58 @@ def compute_boltzmann_populations(
                     rec.metadata["population_mode"] = "supplied_population"
                 continue
 
+        is_gaussian = all(rec.source_type == "gaussian_log" for rec in recs)
         values: List[Optional[float]] = []
-        mode = None
-        for rec in recs:
-            if rec.free_energy is not None:
-                values.append(rec.free_energy)
-                mode = "free_energy"
-            elif rec.energy is not None:
-                values.append(rec.energy)
-                mode = "energy"
-            else:
-                values.append(None)
 
-        if any(v is None for v in values):
+        if is_gaussian:
+            if resolved_gaussian_source == "gibbs":
+                values = [rec.free_energy for rec in recs]
+                mode = "gibbs_free_energy"
+            else:
+                values = [rec.energy for rec in recs]
+                mode = "electronic_energy"
+        else:
+            # For SDF, use complete stored free-energy data when present;
+            # otherwise use complete conformational-search energy data.
+            if all(rec.free_energy is not None for rec in recs):
+                values = [rec.free_energy for rec in recs]
+                mode = "sdf_free_energy"
+            elif all(rec.energy is not None for rec in recs):
+                values = [rec.energy for rec in recs]
+                mode = "sdf_energy"
+            else:
+                values = [None for _ in recs]
+                mode = "equal_weight"
+
+        if any(value is None for value in values):
             total = len(recs)
             for rec in recs:
                 rec.population = 100.0 / total
                 rec.metadata["population_mode"] = "equal_weight"
             continue
 
-        numeric_values = [float(v) for v in values if v is not None]
-        min_e = min(numeric_values)
+        numeric_values = [float(value) for value in values if value is not None]
+        min_energy = min(numeric_values)
 
-        # Gaussian energies are in hartree. SDF search energies are commonly in kcal/mol.
-        if all(rec.source_type == "gaussian_log" for rec in recs):
-            deltas = [hartree_to_kcal(float(v) - min_e) for v in values if v is not None]
+        # Gaussian energies are in hartree. SDF search energies are treated as kcal/mol.
+        if is_gaussian:
+            deltas = [
+                hartree_to_kcal(float(value) - min_energy)
+                for value in values
+                if value is not None
+            ]
         else:
-            deltas = [float(v) - min_e for v in values if v is not None]
+            deltas = [
+                float(value) - min_energy for value in values if value is not None
+            ]
 
-        weights = [math.exp(-d / (r_kcal * temperature)) for d in deltas]
-        denom = sum(weights)
+        weights = [math.exp(-delta / (r_kcal * temperature)) for delta in deltas]
+        denominator = sum(weights)
         for rec, weight in zip(recs, weights):
-            rec.population = 100.0 * weight / denom
-            rec.metadata["population_mode"] = mode or "unknown"
+            rec.population = 100.0 * weight / denominator
+            rec.metadata["population_mode"] = mode
+            if is_gaussian and resolved_gaussian_source is not None:
+                rec.metadata["gaussian_energy_source"] = resolved_gaussian_source
     return records
 
 
@@ -580,6 +676,22 @@ def clone_mapping_items(
             }
         )
     return cloned
+
+
+def population_mode_label(mode: str) -> str:
+    key_map = {
+        "supplied_population": "mode_supplied_population",
+        "sdf_energy": "mode_sdf_energy",
+        "sdf_free_energy": "mode_sdf_free_energy",
+        "electronic_energy": "mode_electronic_energy",
+        "gibbs_free_energy": "mode_gibbs_free_energy",
+        "equal_weight": "mode_equal_weight",
+        "unknown": "mode_unknown",
+        # Backward compatibility with projects created before v1.2.0
+        "energy": "mode_electronic_energy",
+        "free_energy": "mode_gibbs_free_energy",
+    }
+    return t(key_map.get(str(mode), "mode_unknown"))
 
 
 # ==============================
@@ -704,6 +816,7 @@ def build_project_bytes() -> bytes:
             "minimum_distance_A": float(st.session_state.analysis_minimum_distance),
             "maximum_distance_A": float(st.session_state.analysis_maximum_distance),
             "boltzmann_temperature_K": float(st.session_state.analysis_temperature),
+            "gaussian_energy_source": str(st.session_state.gaussian_energy_source),
         },
         "records": [conformer_record_to_dict(r) for r in st.session_state.records],
         "atom_mappings": serializable_atom_mappings(st.session_state.atom_mappings),
@@ -774,6 +887,10 @@ def load_project_into_state(data: Dict[str, object]) -> None:
     st.session_state.analysis_temperature = float(
         settings.get("boltzmann_temperature_K", 298.15)
     )
+    saved_energy_source = str(settings.get("gaussian_energy_source", "electronic"))
+    if saved_energy_source not in {"automatic", "electronic", "gibbs"}:
+        saved_energy_source = "electronic"
+    st.session_state.gaussian_energy_source = saved_energy_source
     st.session_state.analysis_result_rows = list(data.get("analysis_results", []))
     st.session_state.analysis_detail_rows = list(data.get("analysis_details", []))
     st.session_state.analysis_skipped_messages = list(
@@ -784,9 +901,9 @@ def load_project_into_state(data: Dict[str, object]) -> None:
     )
     saved_language = str(data.get("language", current_language()))
     if saved_language not in {"ja", "en"}:
-        saved_language = "ja"
+        saved_language = "en"
     st.session_state.pending_language = saved_language
-    notice_language = TEXTS.get(saved_language, TEXTS["ja"])
+    notice_language = TEXTS.get(saved_language, TEXTS["en"])
     st.session_state.project_notice = (
         "success",
         notice_language["project_loaded"].format(
@@ -817,6 +934,7 @@ def init_state():
         "analysis_minimum_distance": 0.0,
         "analysis_maximum_distance": 3.5,
         "analysis_temperature": 298.15,
+        "gaussian_energy_source": "electronic",
         "distance_criteria_records": [
             {"criterion": "NOE 1", "proton_or_group_A": "", "proton_or_group_B": ""}
         ],
@@ -824,8 +942,8 @@ def init_state():
         "analysis_result_rows": [],
         "analysis_detail_rows": [],
         "analysis_skipped_messages": [],
-        "language": "ja",
-        "language_display": "日本語",
+        "language": "en",
+        "language_display": "English",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -971,6 +1089,14 @@ else:
     st.subheader(t("upload_gaussian"))
     st.write(t("upload_gaussian_desc"))
 
+    gaussian_energy_source = st.selectbox(
+        t("population_energy_source"),
+        ["automatic", "electronic", "gibbs"],
+        format_func=lambda value: t(f"energy_source_{value}"),
+        key="gaussian_energy_source",
+    )
+    st.caption(t("population_energy_help"))
+
     if "gaussian_group_count" not in st.session_state:
         st.session_state.gaussian_group_count = 1
     if "gaussian_group_specs" not in st.session_state:
@@ -1032,7 +1158,18 @@ else:
                     rec = parse_gaussian_log(f, group_spec["group"], group_spec["candidate"])
                     all_records.append(rec)
                     total_files += 1
-            all_records = compute_boltzmann_populations(all_records, temperature=temperature)
+            try:
+                all_records = compute_boltzmann_populations(
+                    all_records,
+                    temperature=temperature,
+                    gaussian_energy_source=gaussian_energy_source,
+                )
+            except PopulationEnergyError as exc:
+                if exc.code in {"missing_electronic", "missing_gibbs"}:
+                    st.error(t(exc.code, files=", ".join(exc.files)))
+                else:
+                    st.error(t(exc.code))
+                st.stop()
             st.session_state.records = all_records
             st.session_state.loaded = True
             st.session_state.atom_mappings = {}
@@ -1068,7 +1205,7 @@ if st.session_state.loaded and st.session_state.records:
             "energy": r.energy,
             "free_energy": r.free_energy,
             "population": r.population,
-            "population_mode": r.metadata.get("population_mode", ""),
+            "population_mode": population_mode_label(r.metadata.get("population_mode", "unknown")),
         }
         for r in recs
     ])
