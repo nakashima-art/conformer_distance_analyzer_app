@@ -297,28 +297,18 @@ else:
     all_uploaded_log_files = []
 
     for i in range(st.session_state.gaussian_group_count):
-        with st.container(border=True):
-            st.markdown(f"**Group {i+1}**")
-            group_name = st.text_input(
+        with st.container(border=True):            group_name = st.text_input(
                 f"Group {i+1} name",
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
                 key=f"gaussian_group_name_{i}",
-            )
-            candidate_name = st.text_input(
-                f"Group {i+1} candidate label",
-                value=st.session_state.gaussian_group_specs.get(i, {}).get("candidate", f"candidate_{i+1}"),
-                key=f"gaussian_candidate_name_{i}",
-            )
-            files = st.file_uploader(
+            )            files = st.file_uploader(
                 f"Gaussian log files for Group {i+1}",
                 type=["log", "out"],
                 accept_multiple_files=True,
                 key=f"gaussian_group_files_{i}",
             )
-            if files:
-                st.session_state.gaussian_group_specs[i] = {
+            if files:                st.session_state.gaussian_group_specs[i] = {
                     "group": group_name,
-                    "candidate": candidate_name,
                 }
                 group_specs.append({
                     "group": group_name,
@@ -326,10 +316,9 @@ else:
                     "files": files,
                 })
                 all_uploaded_log_files.extend(files)
-            else:
-                group_specs.append({
+            else:                group_specs.append({
                     "group": group_name,
-                    "candidate": candidate_name,
+                    "candidate": group_name,
                     "files": [],
                 })
 
