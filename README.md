@@ -1,57 +1,76 @@
 # Conformer Distance Analyzer
 
-A Streamlit app for evaluating the geometrical compatibility of experimentally observed NOE correlations with conformer ensembles derived from multi-conformer SDF files or Gaussian log files.
+**Version 1.2.0**
 
-## Features
+Conformer Distance Analyzer is a Streamlit application for comparing conformer ensembles using user-defined H···H distance criteria and conformer populations. It supports multi-conformer SDF files and Gaussian log files.
 
-- Read multi-conformer SDF files
-- Read multiple Gaussian log files
-- Group conformers by candidate stereochemistry or user-defined labels
-- Define atom mappings for each candidate
-- Define interchangeable proton sets such as H-2′/H-6′
-- Evaluate user-defined H···H distance criteria
-- Compare summed conformer populations satisfying distance thresholds
-- Export candidate comparison tables and per-conformer analysis as CSV
+## Main features
 
-## Supported input types
+- Load one or more multi-conformer SDF files
+- Load Gaussian log files grouped by candidate
+- Select atoms directly in an interactive 3D molecular viewer
+- Register candidate-specific proton labels and atom mappings
+- Copy mappings from another candidate
+  - labels and atom numbers
+  - labels only
+  - apply the current mapping to all compatible candidates
+- Define H···H distance criteria
+- Compare the summed populations of conformers satisfying the selected distance range
+- Save the complete analysis as a project file and reopen it later
+- Switch between English and Japanese interfaces
 
-### 1. Multi-conformer SDF
-Use this mode when conformer populations are already estimated by external conformer-search software such as CONFLEX.
+## Population handling
 
-### 2. Gaussian log files
-Use this mode when each conformer is stored as a separate Gaussian output file.  
-Multiple log files can be uploaded together and grouped by candidate relative configuration or any other user-defined label.
+### SDF files
 
-The app extracts:
-- final geometry
-- electronic energy when available
-- Gibbs free energy when available
+The application uses conformer populations stored in the SDF file when available. If populations are not present but conformational-search energies are available, Boltzmann populations are calculated from those energies. If neither populations nor usable energies are found, equal populations are assigned.
 
-If free energies are available, conformer populations are estimated from Boltzmann weighting.  
-If not, electronic energies are used.  
-If neither is available, equal populations are assigned within each candidate group.
+### Gaussian log files
 
-## Typical workflow
+For Gaussian log files, the energy source used to calculate conformer populations can be selected:
 
-1. Upload SDF ensembles or Gaussian log files
-2. Assign each file to a group and candidate
-3. Define atom mappings
-4. Define interchangeable proton groups if needed
-5. Define distance criteria corresponding to observed NOEs
-6. Run the analysis
-7. Compare summed conformer populations across candidates
-8. Export results as CSV
+- **Automatic**: Gibbs free energy is used only when it is available for every conformer; otherwise, electronic energy is used.
+- **Electronic energy**: the final SCF electronic energy is used.
+- **Gibbs free energy**: Gibbs free energy is used. Every conformer must contain frequency-calculation results with a Gibbs free energy value.
 
-## Example use cases
+The default setting is **Electronic energy**.
 
-- NOE-based stereochemical assignment
-- Comparing candidate relative configurations
-- Evaluating conformer ensembles against experimental distance constraints
-- Screening conformers for proximity-based criteria
+## Installation
 
-## Local installation
+Install the required packages:
 
-### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/conformer-distance-analyzer.git
-cd conformer-distance-analyzer
+pip install -r requirements.txt
+```
+
+Run the application:
+
+```bash
+streamlit run app.py
+```
+
+## File structure
+
+```text
+conformer_distance_analyzer_click/
+├── app.py
+├── requirements.txt
+├── README.md
+└── atom_picker_component/
+    └── index.html
+```
+
+The `atom_picker_component` directory must remain in the same directory as `app.py`.
+
+## Streamlit Community Cloud
+
+Upload the complete folder structure to the GitHub repository connected to Streamlit Community Cloud. After replacing files, reboot the app from the Streamlit management screen.
+
+## Project files
+
+A saved project contains the loaded conformer coordinates, energies, populations, candidate-specific atom mappings, distance criteria, analysis settings, and the most recent results. Project files can be downloaded to the local computer and reopened in the application.
+
+## Author
+
+Developed by **Ken-ichi Nakashima**  
+Laboratory of Medicinal Resources, School of Pharmacy, Aichi Gakuin University
