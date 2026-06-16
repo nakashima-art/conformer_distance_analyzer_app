@@ -286,67 +286,87 @@ if input_mode == "SDF ensemble":
 
 else:
     st.subheader("Upload Gaussian log files")
-    st.write("Upload multiple Gaussian log files and organize them into candidate groups. Each group can be renamed.")
-    log_files = st.file_uploader("Gaussian log files", type=["log", "out"], accept_multiple_files=True)
+    st.write("Upload Gaussian log files in groups. After files are added to one group, a new upload area appears for the next group.")
 
-    if log_files:
-        st.markdown("#### Group Gaussian logs")
-        n_groups = st.number_input("Number of groups", min_value=1, max_value=12, value=2, step=1)
-        group_assignments = []
-        file_names = [f.name for f in log_files]
+    if "gaussian_group_count" not in st.session_state:
+        st.session_state.gaussian_group_count = 1
+    if "gaussian_group_specs" not in st.session_state:
+        st.session_state.gaussian_group_specs = {}
 
-        for i in range(int(n_groups)):
-            with st.container(border=True):
-                st.markdown(f"**Group {i+1}**")
-                default_group_name = f"Group {i+1}"
-                group_name = st.text_input(
-                    f"Group {i+1} name",
-                    value=default_group_name,
-                    key=f"group_name_{i}"
-                )
-                default_candidate_name = f"candidate_{i+1}"
-                candidate_name = st.text_input(
-                    f"Group {i+1} candidate label",
-                    value=default_candidate_name,
-                    key=f"candidate_name_{i}"
-                )
-                selected_files = st.multiselect(
-                    f"Files for Group {i+1}",
-                    options=file_names,
-                    default=[],
-                    key=f"group_files_{i}"
-                )
-                for fn in selected_files:
-                    group_assignments.append({
-                        "file_name": fn,
-                        "group": group_name,
-                        "candidate": candidate_name,
-                    })
+    group_specs = []
+    all_uploaded_log_files = []
 
-        if group_assignments:
-            assign_df = pd.DataFrame(group_assignments).drop_duplicates(subset=["file_name"], keep="last")
-            st.markdown("#### Current assignments")
-            st.dataframe(assign_df, use_container_width=True)
-        else:
-            assign_df = pd.DataFrame(columns=["file_name", "group", "candidate"])
-
-        unassigned = [fn for fn in file_names if fn not in set(assign_df["file_name"].tolist())]
-        if unassigned:
-            st.warning(f"Unassigned files: {', '.join(unassigned)}")
-
-        if st.button("Load Gaussian log files"):
-            if unassigned:
-                st.error("Please assign all uploaded Gaussian log files to a group before loading.")
+    for i in range(st.session_state.gaussian_group_count):
+        with st.container(border=True):
+            st.markdown(f"**Group {i+1}**")
+            group_name = st.text_input(
+                f"Group {i+1} name",
+                value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
+                key=f"gaussian_group_name_{i}",
+            )
+            candidate_name = st.text_input(
+                f"Group {i+1} candidate label",
+                value=st.session_state.gaussian_group_specs.get(i, {}).get("candidate", f"candidate_{i+1}"),
+                key=f"gaussian_candidate_name_{i}",
+            )
+            files = st.file_uploader(
+                f"Gaussian log files for Group {i+1}",
+                type=["log", "out"],
+                accept_multiple_files=True,
+                key=f"gaussian_group_files_{i}",
+            )
+            if files:
+                st.session_state.gaussian_group_specs[i] = {
+                    "group": group_name,
+                    "candidate": candidate_name,
+                }
+                group_specs.append({
+                    "group": group_name,
+                    "candidate": candidate_name,
+                    "files": files,
+                })
+                all_uploaded_log_files.extend(files)
             else:
-                all_records = []
-                for f in log_files:
-                    row = assign_df.loc[assign_df["file_name"] == f.name].iloc[0]
-                    rec = parse_gaussian_log(f, str(row["group"]), str(row["candidate"]))
+                group_specs.append({
+                    "group": group_name,
+                    "candidate": candidate_name,
+                    "files": [],
+                })
+
+    last_group_has_files = bool(group_specs and group_specs[-1]["files"])
+    if last_group_has_files:
+        if st.button("Add another Gaussian log group"):
+            st.session_state.gaussian_group_count += 1
+            st.rerun()
+
+    populated_groups = [g for g in group_specs if g["files"]]
+    if populated_groups:
+        summary_rows = []
+        for g in populated_groups:
+            for f in g["files"]:
+                summary_rows.append({
+                    "group": g["group"],
+                    "candidate": g["candidate"],
+                    "file_name": f.name,
+                })
+        st.markdown("#### Current assignments")
+        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
+
+    if st.button("Load Gaussian log files"):
+        if not populated_groups:
+            st.error("Please upload at least one Gaussian log group.")
+        else:
+            all_records = []
+            total_files = 0
+            for g in populated_groups:
+                for f in g["files"]:
+                    rec = parse_gaussian_log(f, g["group"], g["candidate"])
                     all_records.append(rec)
-                all_records = compute_boltzmann_populations(all_records, temperature=temperature)
-                st.session_state.records = all_records
-                st.session_state.loaded = True
-                st.success(f"Loaded {len(all_records)} conformers from {len(log_files)} Gaussian log file(s).")
+                    total_files += 1
+            all_records = compute_boltzmann_populations(all_records, temperature=temperature)
+            st.session_state.records = all_records
+            st.session_state.loaded = True
+            st.success(f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) across {len(populated_groups)} group(s).")
 
 
 # ==============================
