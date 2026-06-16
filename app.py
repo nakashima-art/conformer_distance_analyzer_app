@@ -301,7 +301,8 @@ else:
                 f"Group {i+1} name",
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
                 key=f"gaussian_group_name_{i}",
-            )            files = st.file_uploader(
+            )
+            files = st.file_uploader(
                 f"Gaussian log files for Group {i+1}",
                 type=["log", "out"],
                 accept_multiple_files=True,
@@ -309,10 +310,9 @@ else:
             )
             if files:                st.session_state.gaussian_group_specs[i] = {
                     "group": group_name,
-                }
-                group_specs.append({
+                }                group_specs.append({
                     "group": group_name,
-                    "candidate": candidate_name,
+                    "candidate": group_name,
                     "files": files,
                 })
                 all_uploaded_log_files.extend(files)
