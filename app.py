@@ -1,6 +1,8 @@
 import io
+import json
 import math
 import re
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -319,6 +321,216 @@ def clone_mapping_items(
 
 
 # ==============================
+# Project save / load
+# ==============================
+PROJECT_FORMAT = "Conformer Distance Analyzer Project"
+PROJECT_VERSION = 1
+
+
+def _optional_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
+
+
+def conformer_record_to_dict(record: ConformerRecord) -> Dict[str, object]:
+    return {
+        "source_type": record.source_type,
+        "source_name": record.source_name,
+        "group": record.group,
+        "candidate": record.candidate,
+        "conformer_id": record.conformer_id,
+        "atoms": list(record.atoms),
+        "coords": np.asarray(record.coords, dtype=float).tolist(),
+        "energy": _optional_float(record.energy),
+        "free_energy": _optional_float(record.free_energy),
+        "population": _optional_float(record.population),
+        "metadata": {str(k): str(v) for k, v in record.metadata.items()},
+    }
+
+
+def conformer_record_from_dict(data: Dict[str, object]) -> ConformerRecord:
+    required = [
+        "source_type", "source_name", "group", "candidate",
+        "conformer_id", "atoms", "coords",
+    ]
+    missing = [key for key in required if key not in data]
+    if missing:
+        raise ValueError("A conformer record is missing: " + ", ".join(missing))
+
+    atoms = [str(x) for x in data["atoms"]]
+    coords = np.asarray(data["coords"], dtype=float)
+    if coords.shape != (len(atoms), 3):
+        raise ValueError(
+            f"Invalid coordinate shape for {data.get('conformer_id', 'unknown conformer')}."
+        )
+
+    return ConformerRecord(
+        source_type=str(data["source_type"]),
+        source_name=str(data["source_name"]),
+        group=str(data["group"]),
+        candidate=str(data["candidate"]),
+        conformer_id=str(data["conformer_id"]),
+        atoms=atoms,
+        coords=coords,
+        energy=_optional_float(data.get("energy")),
+        free_energy=_optional_float(data.get("free_energy")),
+        population=_optional_float(data.get("population")),
+        metadata={str(k): str(v) for k, v in dict(data.get("metadata", {})).items()},
+    )
+
+
+def serializable_atom_mappings(
+    mappings: Dict[str, List[Dict[str, object]]],
+) -> Dict[str, List[Dict[str, object]]]:
+    result: Dict[str, List[Dict[str, object]]] = {}
+    for candidate_key, items in mappings.items():
+        result[str(candidate_key)] = [
+            {
+                "label": str(item.get("label", "")),
+                "atom_numbers": [int(n) for n in item.get("atom_numbers", [])],
+            }
+            for item in items
+        ]
+    return result
+
+
+def restore_atom_mappings(
+    mappings: Dict[str, object],
+) -> Dict[str, List[Dict[str, object]]]:
+    restored: Dict[str, List[Dict[str, object]]] = {}
+    for candidate_key, raw_items in mappings.items():
+        items: List[Dict[str, object]] = []
+        for raw_item in list(raw_items):
+            item = dict(raw_item)
+            atom_numbers = sorted({int(n) for n in item.get("atom_numbers", [])})
+            items.append(
+                {
+                    "label": str(item.get("label", "")),
+                    "atom_numbers": atom_numbers,
+                    "atom_indices": [atom_index_from_user_number(n) for n in atom_numbers],
+                }
+            )
+        restored[str(candidate_key)] = items
+    return restored
+
+
+def normalize_criteria_records(raw_records: object) -> List[Dict[str, str]]:
+    normalized: List[Dict[str, str]] = []
+    for raw in list(raw_records or []):
+        row = dict(raw)
+        normalized.append(
+            {
+                "criterion": str(row.get("criterion", "")),
+                "proton_or_group_A": str(row.get("proton_or_group_A", "")),
+                "proton_or_group_B": str(row.get("proton_or_group_B", "")),
+            }
+        )
+    return normalized or [
+        {"criterion": "NOE 1", "proton_or_group_A": "", "proton_or_group_B": ""}
+    ]
+
+
+def build_project_bytes() -> bytes:
+    payload = {
+        "format": PROJECT_FORMAT,
+        "version": PROJECT_VERSION,
+        "project_name": str(st.session_state.project_name).strip() or "conformer_distance_project",
+        "settings": {
+            "minimum_distance_A": float(st.session_state.analysis_minimum_distance),
+            "maximum_distance_A": float(st.session_state.analysis_maximum_distance),
+            "boltzmann_temperature_K": float(st.session_state.analysis_temperature),
+        },
+        "records": [conformer_record_to_dict(r) for r in st.session_state.records],
+        "atom_mappings": serializable_atom_mappings(st.session_state.atom_mappings),
+        "distance_criteria": normalize_criteria_records(
+            st.session_state.distance_criteria_records
+        ),
+        "analysis_results": list(st.session_state.analysis_result_rows),
+        "analysis_details": list(st.session_state.analysis_detail_rows),
+        "analysis_skipped_messages": list(st.session_state.analysis_skipped_messages),
+    }
+
+    json_bytes = json.dumps(
+        payload,
+        ensure_ascii=False,
+        indent=2,
+        allow_nan=False,
+    ).encode("utf-8")
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("project.json", json_bytes)
+    return buffer.getvalue()
+
+
+def read_project_bytes(raw_bytes: bytes) -> Dict[str, object]:
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw_bytes), "r") as archive:
+            if "project.json" not in archive.namelist():
+                raise ValueError("project.json was not found in the project archive.")
+            data = json.loads(archive.read("project.json").decode("utf-8"))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("The uploaded file is not a valid CDA project ZIP file.") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError("The project JSON is invalid.") from exc
+
+    if data.get("format") != PROJECT_FORMAT:
+        raise ValueError("This file is not a Conformer Distance Analyzer project.")
+    version = int(data.get("version", 0))
+    if version > PROJECT_VERSION:
+        raise ValueError(
+            f"This project was created by a newer format version ({version})."
+        )
+    if not isinstance(data.get("records"), list) or not data["records"]:
+        raise ValueError("The project does not contain any conformer records.")
+    return data
+
+
+def load_project_into_state(data: Dict[str, object]) -> None:
+    records = [conformer_record_from_dict(dict(item)) for item in data["records"]]
+    settings = dict(data.get("settings", {}))
+
+    st.session_state.records = records
+    st.session_state.loaded = True
+    st.session_state.atom_mappings = restore_atom_mappings(
+        dict(data.get("atom_mappings", {}))
+    )
+    st.session_state.mapping_selections = {}
+    st.session_state.distance_criteria_records = normalize_criteria_records(
+        data.get("distance_criteria", [])
+    )
+    st.session_state.criteria_editor_revision += 1
+    st.session_state.analysis_minimum_distance = float(
+        settings.get("minimum_distance_A", 3.0)
+    )
+    st.session_state.analysis_maximum_distance = float(
+        settings.get("maximum_distance_A", 3.5)
+    )
+    st.session_state.analysis_temperature = float(
+        settings.get("boltzmann_temperature_K", 298.15)
+    )
+    st.session_state.analysis_result_rows = list(data.get("analysis_results", []))
+    st.session_state.analysis_detail_rows = list(data.get("analysis_details", []))
+    st.session_state.analysis_skipped_messages = list(
+        data.get("analysis_skipped_messages", [])
+    )
+    st.session_state.project_name = str(
+        data.get("project_name", "conformer_distance_project")
+    )
+    st.session_state.project_notice = (
+        "success",
+        f"Loaded project '{st.session_state.project_name}' with {len(records)} conformer(s).",
+    )
+
+
+def safe_project_filename(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name.strip())
+    cleaned = cleaned.strip("._") or "conformer_distance_project"
+    return f"{cleaned}.cda.zip"
+
+
+# ==============================
 # App state helpers
 # ==============================
 def init_state():
@@ -328,6 +540,18 @@ def init_state():
         "atom_mappings": {},
         "mapping_selections": {},
         "mapping_notice": None,
+        "project_name": "conformer_distance_project",
+        "project_notice": None,
+        "analysis_minimum_distance": 3.0,
+        "analysis_maximum_distance": 3.5,
+        "analysis_temperature": 298.15,
+        "distance_criteria_records": [
+            {"criterion": "NOE 1", "proton_or_group_A": "", "proton_or_group_B": ""}
+        ],
+        "criteria_editor_revision": 0,
+        "analysis_result_rows": [],
+        "analysis_detail_rows": [],
+        "analysis_skipped_messages": [],
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -342,6 +566,48 @@ st.caption(
     "user-defined H···H distance criteria and conformer populations."
 )
 
+project_notice = st.session_state.pop("project_notice", None)
+if project_notice:
+    notice_type, notice_text = project_notice
+    if notice_type == "success":
+        st.success(notice_text)
+    elif notice_type == "warning":
+        st.warning(notice_text)
+    else:
+        st.info(notice_text)
+
+with st.expander("Open a saved project", expanded=not st.session_state.loaded):
+    st.write(
+        "A saved project contains conformers, coordinates, populations, atom mappings, "
+        "distance criteria, settings, and the most recent analysis results."
+    )
+    uploaded_project = st.file_uploader(
+        "Saved CDA project",
+        type=["zip"],
+        key="saved_project_uploader",
+    )
+    confirm_project_replace = st.checkbox(
+        "Replace the current session with the uploaded project.",
+        key="confirm_project_replace",
+    )
+    if st.session_state.loaded:
+        st.warning(
+            "Loading a project replaces the conformers, mappings, criteria, settings, "
+            "and stored results currently open in this session."
+        )
+    if st.button(
+        "Upload saved project",
+        disabled=uploaded_project is None or not confirm_project_replace,
+        type="primary",
+        key="load_saved_project_button",
+    ):
+        try:
+            project_data = read_project_bytes(uploaded_project.getvalue())
+            load_project_into_state(project_data)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Could not load the project: {exc}")
+
 
 # ==============================
 # Sidebar configuration
@@ -349,15 +615,25 @@ st.caption(
 st.sidebar.header("Analysis settings")
 col_min_dist, col_max_dist = st.sidebar.columns(2)
 minimum_distance = col_min_dist.number_input(
-    "Minimum distance (Å)", value=3.0, step=0.1, format="%.2f"
+    "Minimum distance (Å)",
+    step=0.1,
+    format="%.2f",
+    key="analysis_minimum_distance",
 )
 maximum_distance = col_max_dist.number_input(
-    "Maximum distance (Å)", value=3.5, step=0.1, format="%.2f"
+    "Maximum distance (Å)",
+    step=0.1,
+    format="%.2f",
+    key="analysis_maximum_distance",
 )
 distance_range_valid = float(minimum_distance) <= float(maximum_distance)
 if not distance_range_valid:
     st.sidebar.error("Minimum distance must be less than or equal to maximum distance.")
-temperature = st.sidebar.number_input("Boltzmann temperature (K)", value=298.15, step=1.0)
+temperature = st.sidebar.number_input(
+    "Boltzmann temperature (K)",
+    step=1.0,
+    key="analysis_temperature",
+)
 
 
 # ==============================
@@ -398,6 +674,13 @@ if input_mode == "SDF ensemble":
             st.session_state.loaded = True
             st.session_state.atom_mappings = {}
             st.session_state.mapping_selections = {}
+            st.session_state.distance_criteria_records = [
+                {"criterion": "NOE 1", "proton_or_group_A": "", "proton_or_group_B": ""}
+            ]
+            st.session_state.criteria_editor_revision += 1
+            st.session_state.analysis_result_rows = []
+            st.session_state.analysis_detail_rows = []
+            st.session_state.analysis_skipped_messages = []
             st.success(f"Loaded {len(all_records)} conformers from {len(sdf_files)} SDF file(s).")
 else:
     st.subheader("Upload Gaussian log files")
@@ -472,6 +755,13 @@ else:
             st.session_state.loaded = True
             st.session_state.atom_mappings = {}
             st.session_state.mapping_selections = {}
+            st.session_state.distance_criteria_records = [
+                {"criterion": "NOE 1", "proton_or_group_A": "", "proton_or_group_B": ""}
+            ]
+            st.session_state.criteria_editor_revision += 1
+            st.session_state.analysis_result_rows = []
+            st.session_state.analysis_detail_rows = []
+            st.session_state.analysis_skipped_messages = []
             st.success(
                 f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) "
                 f"across {len(populated_groups)} group(s)."
@@ -829,17 +1119,16 @@ if st.session_state.loaded and st.session_state.records:
     )
 
     criteria_default = pd.DataFrame(
-        {
-            "criterion": ["NOE 1"],
-            "proton_or_group_A": [""],
-            "proton_or_group_B": [""],
-        }
+        normalize_criteria_records(st.session_state.distance_criteria_records)
     )
     criteria_df = st.data_editor(
         criteria_default,
         num_rows="dynamic",
         use_container_width=True,
-        key="global_distance_criteria",
+        key=f"global_distance_criteria_{st.session_state.criteria_editor_revision}",
+    )
+    st.session_state.distance_criteria_records = normalize_criteria_records(
+        criteria_df.fillna("").to_dict(orient="records")
     )
 
     # ==============================
@@ -963,38 +1252,73 @@ if st.session_state.loaded and st.session_state.records:
                 )
                 analysis_rows.append(result_row)
 
-            if skipped_messages:
-                st.warning("Some candidates were skipped:\n\n" + "\n\n".join(skipped_messages))
-
+            st.session_state.analysis_skipped_messages = skipped_messages
             if analysis_rows:
                 result_df = pd.DataFrame(analysis_rows).sort_values(
                     by=["all_criteria_same_conformer_population_sum"],
                     ascending=[False],
                 )
                 detail_df = pd.DataFrame(detail_rows)
-
-                st.subheader("Candidate comparison")
-                st.dataframe(result_df, use_container_width=True)
-
-                st.subheader("Per-conformer detail")
-                st.dataframe(detail_df, use_container_width=True, height=320)
-
-                csv_result = result_df.to_csv(index=False).encode("utf-8-sig")
-                csv_detail = detail_df.to_csv(index=False).encode("utf-8-sig")
-                st.download_button(
-                    "Download candidate comparison CSV",
-                    csv_result,
-                    "candidate_comparison.csv",
-                    "text/csv",
-                )
-                st.download_button(
-                    "Download per-conformer detail CSV",
-                    csv_detail,
-                    "per_conformer_detail.csv",
-                    "text/csv",
-                )
+                st.session_state.analysis_result_rows = result_df.to_dict(orient="records")
+                st.session_state.analysis_detail_rows = detail_df.to_dict(orient="records")
             else:
+                st.session_state.analysis_result_rows = []
+                st.session_state.analysis_detail_rows = []
                 st.warning("No analysis rows were generated. Check atom mappings and criteria.")
+
+    if st.session_state.analysis_skipped_messages:
+        st.warning(
+            "Some candidates were skipped:\n\n"
+            + "\n\n".join(st.session_state.analysis_skipped_messages)
+        )
+
+    if st.session_state.analysis_result_rows:
+        result_df = pd.DataFrame(st.session_state.analysis_result_rows)
+        detail_df = pd.DataFrame(st.session_state.analysis_detail_rows)
+
+        st.subheader("Candidate comparison")
+        st.dataframe(result_df, use_container_width=True)
+
+        st.subheader("Per-conformer detail")
+        st.dataframe(detail_df, use_container_width=True, height=320)
+
+        csv_result = result_df.to_csv(index=False).encode("utf-8-sig")
+        csv_detail = detail_df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "Download candidate comparison CSV",
+            csv_result,
+            "candidate_comparison.csv",
+            "text/csv",
+        )
+        st.download_button(
+            "Download per-conformer detail CSV",
+            csv_detail,
+            "per_conformer_detail.csv",
+            "text/csv",
+        )
+
+    st.header("6. Save project")
+    st.write(
+        "Download the current analysis state to your computer. The saved project can later be "
+        "uploaded without re-entering atom labels or re-uploading the original SDF/log files."
+    )
+    st.text_input("Project name", key="project_name")
+    try:
+        project_bytes = build_project_bytes()
+        st.download_button(
+            "Download current project",
+            data=project_bytes,
+            file_name=safe_project_filename(st.session_state.project_name),
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+        )
+        st.caption(
+            "The .cda.zip file contains coordinates, populations, mappings, criteria, settings, "
+            "and the most recent analysis results."
+        )
+    except Exception as exc:
+        st.error(f"Could not prepare the project file: {exc}")
 
 
 st.markdown("---")
