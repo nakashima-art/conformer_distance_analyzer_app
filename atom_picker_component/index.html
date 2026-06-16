@@ -60,9 +60,9 @@
 </head>
 <body>
   <div id="toolbar">
-    <label><input id="show-h" type="checkbox" checked /> H numbers</label>
-    <label><input id="show-all" type="checkbox" /> All atom numbers</label>
-    <label><input id="hydrogen-only" type="checkbox" /> H only</label>
+    <label><input id="show-h" type="checkbox" checked /> <span id="show-h-text">H numbers</span></label>
+    <label><input id="show-all" type="checkbox" /> <span id="show-all-text">All atom numbers</span></label>
+    <label><input id="hydrogen-only" type="checkbox" /> <span id="hydrogen-only-text">H only</span></label>
     <span id="selection-text">Selected: none</span>
   </div>
   <div id="viewer"><div id="status">Loading 3D viewer…</div></div>
@@ -123,6 +123,41 @@
     let requestedHeight = 520;
     let pendingArgs = null;
     let libraryPromise = null;
+    let currentLanguage = "en";
+
+    const UI = {
+      en: {
+        hNumbers: "H numbers",
+        allNumbers: "All atom numbers",
+        hOnly: "H only",
+        selected: "Selected",
+        none: "none",
+        loading: "Loading 3D viewer…",
+        noCoordinates: "No molecular coordinates were supplied.",
+        loadError: "The 3Dmol.js viewer could not be loaded. Check whether external CDN access is blocked by the browser or deployment network."
+      },
+      ja: {
+        hNumbers: "水素原子番号",
+        allNumbers: "全原子番号",
+        hOnly: "水素のみ",
+        selected: "選択中",
+        none: "なし",
+        loading: "3Dビューアを読み込み中…",
+        noCoordinates: "分子座標が指定されていません。",
+        loadError: "3Dmol.jsビューアを読み込めませんでした。ブラウザまたはデプロイ環境で外部CDNへのアクセスが制限されていないか確認してください。"
+      }
+    };
+
+    function ui() {
+      return UI[currentLanguage] || UI.en;
+    }
+
+    function updateUIStrings() {
+      document.getElementById("show-h-text").textContent = ui().hNumbers;
+      document.getElementById("show-all-text").textContent = ui().allNumbers;
+      document.getElementById("hydrogen-only-text").textContent = ui().hOnly;
+      updateSelectionText();
+    }
 
     function setStatus(message) {
       const status = document.getElementById("status");
@@ -167,7 +202,9 @@
 
     function updateSelectionText() {
       const target = document.getElementById("selection-text");
-      target.textContent = selected.length ? `Selected: ${selected.join(", ")}` : "Selected: none";
+      target.textContent = selected.length
+        ? `${ui().selected}: ${selected.join(", ")}`
+        : `${ui().selected}: ${ui().none}`;
     }
 
     function atomNumber(atom) {
@@ -244,6 +281,8 @@
 
     async function renderArgs(args) {
       pendingArgs = args || {};
+      currentLanguage = pendingArgs.language === "ja" ? "ja" : "en";
+      updateUIStrings();
       requestedHeight = Number(pendingArgs.height || 520);
       Streamlit.setFrameHeight(requestedHeight);
 
@@ -257,7 +296,7 @@
         if (args !== pendingArgs) return;
         const xyz = pendingArgs.xyz || "";
         if (!xyz.trim()) {
-          setStatus("No molecular coordinates were supplied.");
+          setStatus(ui().noCoordinates);
           return;
         }
         if (xyz !== currentXYZ || !viewer) {
@@ -268,9 +307,7 @@
         }
       } catch (error) {
         console.error(error);
-        setStatus(
-          "The 3Dmol.js viewer could not be loaded. Check whether external CDN access is blocked by the browser or deployment network."
-        );
+        setStatus(ui().loadError);
       }
     }
 
