@@ -21,6 +21,266 @@ except Exception:
 st.set_page_config(page_title="Conformer Distance Analyzer", layout="wide")
 
 
+APP_VERSION = "1.1.0"
+PROJECT_FORMAT_VERSION = 1
+
+TEXTS = {
+    "ja": {
+        "app_title": "Conformer Distance Analyzer",
+        "app_caption": "SDFまたはGaussian log由来の配座集団を、指定したH···H距離条件と配座存在比に基づいて比較します。",
+        "open_project": "保存済みプロジェクトを開く",
+        "open_project_desc": "保存プロジェクトには、配座、座標、存在比、原子マッピング、距離条件、設定、および直近の解析結果が含まれます。",
+        "saved_project": "保存済みCDAプロジェクト",
+        "replace_session": "現在のセッションをアップロードしたプロジェクトで置き換える",
+        "replace_warning": "プロジェクトを読み込むと、現在の配座、マッピング、距離条件、設定、および保存済み解析結果が置き換えられます。",
+        "upload_project": "保存済みプロジェクトを読み込む",
+        "load_project_error": "プロジェクトを読み込めませんでした：{error}",
+        "project_loaded": "プロジェクト「{name}」を読み込みました（{count}配座）。",
+        "analysis_settings": "解析設定",
+        "minimum_distance": "最小距離（Å）",
+        "maximum_distance": "最大距離（Å）",
+        "distance_error": "最小距離は最大距離以下にしてください。",
+        "distance_note": "NOE／ROE解析では通常、最小距離を0 Åとし、最大距離を設定します。",
+        "temperature": "ボルツマン温度（K）",
+        "input_source": "1. 入力ファイル",
+        "choose_input": "入力形式を選択",
+        "sdf_ensemble": "SDF配座集団",
+        "gaussian_logs": "Gaussian logファイル",
+        "upload_sdf": "SDF配座集団のアップロード",
+        "upload_sdf_desc": "複数配座を含むSDFファイルを1つ以上アップロードしてください。各ファイルを1候補の配座集団として扱います。",
+        "sdf_files": "SDFファイル",
+        "default_group": "デフォルトのグループ名",
+        "load_sdf": "SDF配座集団を読み込む",
+        "loaded_sdf": "{files}個のSDFファイルから{count}配座を読み込みました。",
+        "upload_gaussian": "Gaussian logファイルのアップロード",
+        "upload_gaussian_desc": "Gaussian logファイルをグループごとにアップロードします。ファイルを追加すると、次のグループ用アップロード欄を追加できます。",
+        "group_name": "グループ{number}の名前",
+        "group_files": "グループ{number}のGaussian logファイル",
+        "add_group": "Gaussian logグループを追加",
+        "current_assignments": "#### 現在の割り当て",
+        "load_gaussian": "Gaussian logファイルを読み込む",
+        "need_gaussian": "Gaussian logグループを1つ以上アップロードしてください。",
+        "loaded_gaussian": "{groups}グループ、{files}個のGaussian logファイルから{count}配座を読み込みました。",
+        "loaded_conformers": "2. 読み込んだ配座",
+        "atom_mapping": "3. 原子マッピング",
+        "atom_mapping_desc": "候補を選択し、3D構造上の原子を1個以上クリックしてプロトンラベルを登録します。複数原子を選択した場合は、交換可能な原子グループとして扱います。",
+        "candidate_mapping": "原子マッピングを行う候補",
+        "copy_mappings": "候補間でマッピングをコピー",
+        "copy_once": "マッピングは一度だけコピーされ、コピー後は各候補を独立して編集できます。",
+        "copy_from": "コピー元の候補",
+        "copy_mode": "コピー方法",
+        "labels_atoms": "ラベル＋原子番号",
+        "labels_only": "ラベルのみ",
+        "compatible": "コピー元とコピー先の原子数および元素順序が一致しています。原子番号もコピーできます。",
+        "incompatible": "コピー元とコピー先で原子順序が異なります。「ラベルのみ」を使用してください。",
+        "labels_only_info": "ラベルのみをコピーし、原子番号は未割り当ての状態にします。",
+        "copy_replace_note": "コピーすると、コピー先候補に現在登録されているマッピングはすべて置き換えられます。",
+        "copy_to_candidate": "この候補にマッピングをコピー",
+        "copied_mapping": "{detail}を「{source}」から「{destination}」へコピーしました。コピー後のマッピングは独立しています。",
+        "detail_labels_atoms": "ラベルと原子番号",
+        "detail_labels_only": "ラベルのみ",
+        "apply_all": "##### 現在のマッピングを互換性のある全候補に適用",
+        "apply_all_desc": "原子数と元素順序が一致する候補に、ラベルと原子番号をコピーします。コピー先の既存マッピングは置き換えられます。",
+        "confirm_replace": "互換性のある候補の既存マッピングが置き換えられることを確認しました。",
+        "apply_all_button": "現在のマッピングを互換性のある全候補に適用",
+        "bulk_result": "{copied}個の互換性のある候補にコピーしました。",
+        "bulk_skipped": " 原子順序が異なる{skipped}個の候補はスキップしました。",
+        "click_atoms": "#### 3D構造上の原子をクリック",
+        "viewer_caption": "初期状態では水素原子番号を表示します。ビューア上部のチェックボックスで全原子番号の表示や水素のみの表示を切り替えられます。",
+        "new_mapping": "#### 新しいプロトンマッピング",
+        "selected": "選択中：{items}",
+        "none_selected": "原子がまだ選択されていません。",
+        "label_entry": "ラベルの入力方法",
+        "build_label": "Hラベルを作成",
+        "free_text": "自由入力",
+        "position_number": "位置番号",
+        "position_placeholder": "例：3",
+        "prime": "プライム",
+        "display_label": "表示ラベル：**{label}**",
+        "label": "ラベル",
+        "label_placeholder": "例：H-2′ / H-6′",
+        "save_mapping": "マッピングを保存",
+        "clear_selection": "選択を解除",
+        "enter_label": "プロトンラベルを入力してください。",
+        "select_atom": "3D構造上で原子を1個以上選択してください。",
+        "non_hydrogen": "次の選択原子は水素ではありません：{atoms}",
+        "added": "{label}を追加しました。",
+        "updated": "{label}を更新しました。",
+        "manual_fallback": "手動選択（予備）",
+        "manual_desc": "3D構造のクリック操作が難しい場合のみ使用してください。",
+        "manual_numbers": "1始まりの原子番号（カンマ区切り）",
+        "apply_manual": "手動選択を適用",
+        "out_of_range": "範囲外の原子番号：{atoms}",
+        "integer_error": "カンマ区切りの整数を入力してください。",
+        "registered_mappings": "#### この候補に登録済みのマッピング",
+        "no_mappings": "この候補にはマッピングが登録されていません。",
+        "not_assigned": "未割り当て",
+        "atoms_label": "原子",
+        "show_edit": "原子を表示・編集",
+        "delete": "削除",
+        "mapping_status": "全候補のマッピング状況",
+        "distance_criteria": "4. 距離条件",
+        "criteria_desc": "比較するマッピングラベルを入力してください。同じ距離条件を、各候補固有の原子マッピングに基づいて適用します。",
+        "analysis": "5. 解析",
+        "run_analysis": "距離解析を実行",
+        "need_criterion": "完全な距離条件を1つ以上設定してください。",
+        "no_analysis": "解析結果が生成されませんでした。原子マッピングと距離条件を確認してください。",
+        "skipped": "一部の候補をスキップしました：\n\n{messages}",
+        "candidate_comparison": "候補間比較",
+        "per_conformer": "配座ごとの詳細",
+        "download_comparison": "候補間比較CSVをダウンロード",
+        "download_detail": "配座詳細CSVをダウンロード",
+        "save_project": "6. プロジェクトを保存",
+        "save_project_desc": "現在の解析状態をPCに保存します。保存プロジェクトを読み込めば、原子ラベルの再入力や元のSDF／logファイルの再アップロードなしで解析を再開できます。",
+        "project_name": "プロジェクト名",
+        "download_project": "現在のプロジェクトをダウンロード",
+        "project_contents": ".cda.zipファイルには、座標、存在比、マッピング、距離条件、設定、および直近の解析結果が含まれます。",
+        "prepare_project_error": "プロジェクトファイルを作成できませんでした：{error}",
+        "footer_tip": "ヒント：電子エネルギー／自由エネルギーから存在比を計算する場合はGaussian logを使用します。配座存在比または配座探索エネルギーが保存されている場合はSDFを使用します。",
+        "version_line": "バージョン {app_version}｜プロジェクト形式 v{project_version}",
+        "author_line": "作成者：Ken-ichi Nakashima（愛知学院大学薬学部 薬用資源学講座）",
+        "col_file": "ファイル名", "col_group": "グループ", "col_candidate": "候補",
+        "col_source": "元ファイル", "col_conformer": "配座ID", "col_atoms": "原子数",
+        "col_energy": "エネルギー", "col_free_energy": "自由エネルギー", "col_population": "存在比（%）",
+        "col_population_mode": "存在比の算出法", "col_registered": "登録ラベル数", "col_labels": "ラベル",
+        "col_criterion": "距離条件", "col_a": "プロトン／グループA", "col_b": "プロトン／グループB",
+        "col_min": "最小距離（Å）", "col_max": "最大距離（Å）", "col_distance": "距離（Å）",
+        "col_satisfies": "条件適合", "col_all_sum": "全条件を同一配座で満たす存在比合計（%）",
+        "col_pop_sum_prefix": "存在比合計",
+    },
+    "en": {
+        "app_title": "Conformer Distance Analyzer",
+        "app_caption": "Compare conformer ensembles from SDF or Gaussian log files using user-defined H···H distance criteria and conformer populations.",
+        "open_project": "Open a saved project",
+        "open_project_desc": "A saved project contains conformers, coordinates, populations, atom mappings, distance criteria, settings, and the most recent analysis results.",
+        "saved_project": "Saved CDA project",
+        "replace_session": "Replace the current session with the uploaded project.",
+        "replace_warning": "Loading a project replaces the conformers, mappings, criteria, settings, and stored results currently open in this session.",
+        "upload_project": "Upload saved project",
+        "load_project_error": "Could not load the project: {error}",
+        "project_loaded": "Loaded project '{name}' with {count} conformer(s).",
+        "analysis_settings": "Analysis settings",
+        "minimum_distance": "Minimum distance (Å)",
+        "maximum_distance": "Maximum distance (Å)",
+        "distance_error": "Minimum distance must be less than or equal to maximum distance.",
+        "distance_note": "For NOE/ROE analysis, the minimum distance is normally set to 0 Å and an upper distance cutoff is applied.",
+        "temperature": "Boltzmann temperature (K)",
+        "input_source": "1. Input source",
+        "choose_input": "Choose input type",
+        "sdf_ensemble": "SDF ensemble",
+        "gaussian_logs": "Gaussian log files",
+        "upload_sdf": "Upload SDF ensembles",
+        "upload_sdf_desc": "Upload one or more multi-conformer SDF files. Each file is treated as one candidate ensemble.",
+        "sdf_files": "SDF files",
+        "default_group": "Default group name",
+        "load_sdf": "Load SDF ensembles",
+        "loaded_sdf": "Loaded {count} conformers from {files} SDF file(s).",
+        "upload_gaussian": "Upload Gaussian log files",
+        "upload_gaussian_desc": "Upload Gaussian log files in groups. After files are added to one group, a new upload area can be added for the next group.",
+        "group_name": "Group {number} name",
+        "group_files": "Gaussian log files for Group {number}",
+        "add_group": "Add another Gaussian log group",
+        "current_assignments": "#### Current assignments",
+        "load_gaussian": "Load Gaussian log files",
+        "need_gaussian": "Please upload at least one Gaussian log group.",
+        "loaded_gaussian": "Loaded {count} conformers from {files} Gaussian log file(s) across {groups} group(s).",
+        "loaded_conformers": "2. Loaded conformers",
+        "atom_mapping": "3. Atom mapping",
+        "atom_mapping_desc": "Choose a candidate, click one or more atoms in the 3D structure, assign a proton label, and save the mapping. Multiple selected atoms are treated as an interchangeable group.",
+        "candidate_mapping": "Candidate for atom mapping",
+        "copy_mappings": "Copy mappings between candidates",
+        "copy_once": "Mappings are copied once. After copying, each candidate can be edited independently.",
+        "copy_from": "Copy mapping from",
+        "copy_mode": "Copy mode",
+        "labels_atoms": "Labels and atom numbers",
+        "labels_only": "Labels only",
+        "compatible": "The source and destination have the same atom count and element order. Atom numbers can be copied.",
+        "incompatible": "The atom order differs between the source and destination. Use Labels only.",
+        "labels_only_info": "Only the labels will be copied. Atom assignments will be left empty for this candidate.",
+        "copy_replace_note": "Copying replaces all mappings currently registered for the selected destination candidate.",
+        "copy_to_candidate": "Copy mapping to this candidate",
+        "copied_mapping": "Copied {detail} from {source} to {destination}. The copied mapping is now independent.",
+        "detail_labels_atoms": "labels and atom numbers",
+        "detail_labels_only": "labels only",
+        "apply_all": "##### Apply the current mapping to all compatible candidates",
+        "apply_all_desc": "This copies labels and atom numbers to candidates with the same atom count and element order. Existing mappings in those candidates will be replaced.",
+        "confirm_replace": "I understand that existing mappings in compatible candidates will be replaced.",
+        "apply_all_button": "Apply current mapping to all compatible candidates",
+        "bulk_result": "Copied the current mapping to {copied} compatible candidate(s).",
+        "bulk_skipped": " Skipped {skipped} candidate(s) with different atom ordering.",
+        "click_atoms": "#### Click atoms in the 3D structure",
+        "viewer_caption": "Hydrogen atom numbers are shown by default. Use the checkboxes above the viewer to display all atom numbers or to show hydrogens only.",
+        "new_mapping": "#### New proton mapping",
+        "selected": "Selected: {items}",
+        "none_selected": "No atom is selected yet.",
+        "label_entry": "Label entry",
+        "build_label": "Build H label",
+        "free_text": "Free text",
+        "position_number": "Position number",
+        "position_placeholder": "e.g. 3",
+        "prime": "Prime",
+        "display_label": "Display label: **{label}**",
+        "label": "Label",
+        "label_placeholder": "e.g. H-2′ / H-6′",
+        "save_mapping": "Save mapping",
+        "clear_selection": "Clear selection",
+        "enter_label": "Enter a proton label.",
+        "select_atom": "Select at least one atom in the 3D structure.",
+        "non_hydrogen": "The following selected atoms are not hydrogen atoms: {atoms}",
+        "added": "Added {label}.",
+        "updated": "Updated {label}.",
+        "manual_fallback": "Manual selection fallback",
+        "manual_desc": "Use this only when clicking the 3D structure is difficult.",
+        "manual_numbers": "1-based atom numbers, separated by commas",
+        "apply_manual": "Apply manual selection",
+        "out_of_range": "Out-of-range atom numbers: {atoms}",
+        "integer_error": "Enter integers separated by commas.",
+        "registered_mappings": "#### Registered mappings for this candidate",
+        "no_mappings": "No mappings have been registered for this candidate.",
+        "not_assigned": "Not assigned",
+        "atoms_label": "Atom(s)",
+        "show_edit": "Show/edit atoms",
+        "delete": "Delete",
+        "mapping_status": "Mapping status for all candidates",
+        "distance_criteria": "4. Distance criteria",
+        "criteria_desc": "Enter the mapping labels to compare. The same criterion is applied to every candidate, using that candidate's own atom mapping.",
+        "analysis": "5. Analysis",
+        "run_analysis": "Run distance analysis",
+        "need_criterion": "Define at least one complete distance criterion.",
+        "no_analysis": "No analysis rows were generated. Check atom mappings and criteria.",
+        "skipped": "Some candidates were skipped:\n\n{messages}",
+        "candidate_comparison": "Candidate comparison",
+        "per_conformer": "Per-conformer detail",
+        "download_comparison": "Download candidate comparison CSV",
+        "download_detail": "Download per-conformer detail CSV",
+        "save_project": "6. Save project",
+        "save_project_desc": "Download the current analysis state to your computer. The saved project can later be uploaded without re-entering atom labels or re-uploading the original SDF/log files.",
+        "project_name": "Project name",
+        "download_project": "Download current project",
+        "project_contents": "The .cda.zip file contains coordinates, populations, mappings, criteria, settings, and the most recent analysis results.",
+        "prepare_project_error": "Could not prepare the project file: {error}",
+        "footer_tip": "Tips: Use Gaussian logs when populations should be computed from electronic/free energies. Use SDF when conformer populations or conformer-search energies are stored in the file.",
+        "version_line": "Version {app_version} | Project format v{project_version}",
+        "author_line": "Developed by Ken-ichi Nakashima (Laboratory of Pharmacognosy, School of Pharmacy, Aichi Gakuin University)",
+        "col_file": "File name", "col_group": "Group", "col_candidate": "Candidate",
+        "col_source": "Source", "col_conformer": "Conformer ID", "col_atoms": "Number of atoms",
+        "col_energy": "Energy", "col_free_energy": "Free energy", "col_population": "Population (%)",
+        "col_population_mode": "Population mode", "col_registered": "Registered labels", "col_labels": "Labels",
+        "col_criterion": "Criterion", "col_a": "Proton/group A", "col_b": "Proton/group B",
+        "col_min": "Minimum distance (Å)", "col_max": "Maximum distance (Å)", "col_distance": "Distance (Å)",
+        "col_satisfies": "Satisfies", "col_all_sum": "Population sum satisfying all criteria in the same conformer (%)",
+        "col_pop_sum_prefix": "Population sum",
+    },
+}
+
+def current_language() -> str:
+    return st.session_state.get("language", "ja")
+
+def t(key: str, **kwargs) -> str:
+    text = TEXTS.get(current_language(), TEXTS["ja"]).get(key, key)
+    return text.format(**kwargs) if kwargs else text
+
+
 # ==============================
 # 3D atom-picker component
 # ==============================
@@ -36,6 +296,7 @@ def atom_picker(
     coords: np.ndarray,
     selected_atoms: Optional[List[int]] = None,
     height: int = 520,
+    language: str = "ja",
     key: Optional[str] = None,
 ) -> List[int]:
     """Return selected atom numbers as a 1-based integer list."""
@@ -48,6 +309,7 @@ def atom_picker(
         xyz="\n".join(xyz_lines),
         selected_atoms=default_selection,
         height=int(height),
+        language=str(language),
         key=key,
         default=default_selection,
     )
@@ -324,7 +586,7 @@ def clone_mapping_items(
 # Project save / load
 # ==============================
 PROJECT_FORMAT = "Conformer Distance Analyzer Project"
-PROJECT_VERSION = 1
+PROJECT_VERSION = PROJECT_FORMAT_VERSION
 
 
 def _optional_float(value) -> Optional[float]:
@@ -435,6 +697,8 @@ def build_project_bytes() -> bytes:
     payload = {
         "format": PROJECT_FORMAT,
         "version": PROJECT_VERSION,
+        "app_version": APP_VERSION,
+        "language": current_language(),
         "project_name": str(st.session_state.project_name).strip() or "conformer_distance_project",
         "settings": {
             "minimum_distance_A": float(st.session_state.analysis_minimum_distance),
@@ -502,7 +766,7 @@ def load_project_into_state(data: Dict[str, object]) -> None:
     )
     st.session_state.criteria_editor_revision += 1
     st.session_state.analysis_minimum_distance = float(
-        settings.get("minimum_distance_A", 3.0)
+        settings.get("minimum_distance_A", 0.0)
     )
     st.session_state.analysis_maximum_distance = float(
         settings.get("maximum_distance_A", 3.5)
@@ -518,9 +782,17 @@ def load_project_into_state(data: Dict[str, object]) -> None:
     st.session_state.project_name = str(
         data.get("project_name", "conformer_distance_project")
     )
+    saved_language = str(data.get("language", current_language()))
+    if saved_language not in {"ja", "en"}:
+        saved_language = "ja"
+    st.session_state.pending_language = saved_language
+    notice_language = TEXTS.get(saved_language, TEXTS["ja"])
     st.session_state.project_notice = (
         "success",
-        f"Loaded project '{st.session_state.project_name}' with {len(records)} conformer(s).",
+        notice_language["project_loaded"].format(
+            name=st.session_state.project_name,
+            count=len(records),
+        ),
     )
 
 
@@ -542,7 +814,7 @@ def init_state():
         "mapping_notice": None,
         "project_name": "conformer_distance_project",
         "project_notice": None,
-        "analysis_minimum_distance": 3.0,
+        "analysis_minimum_distance": 0.0,
         "analysis_maximum_distance": 3.5,
         "analysis_temperature": 298.15,
         "distance_criteria_records": [
@@ -552,6 +824,8 @@ def init_state():
         "analysis_result_rows": [],
         "analysis_detail_rows": [],
         "analysis_skipped_messages": [],
+        "language": "ja",
+        "language_display": "日本語",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -560,11 +834,20 @@ def init_state():
 
 init_state()
 
-st.title("Conformer Distance Analyzer")
-st.caption(
-    "Compare conformer ensembles from SDF or Gaussian log files using "
-    "user-defined H···H distance criteria and conformer populations."
+if "pending_language" in st.session_state:
+    pending_language = st.session_state.pop("pending_language")
+    st.session_state.language = pending_language
+    st.session_state.language_display = "日本語" if pending_language == "ja" else "English"
+
+language_display = st.sidebar.selectbox(
+    "言語 / Language",
+    ["日本語", "English"],
+    key="language_display",
 )
+st.session_state.language = "ja" if language_display == "日本語" else "en"
+
+st.title(t("app_title"))
+st.caption(t("app_caption"))
 
 project_notice = st.session_state.pop("project_notice", None)
 if project_notice:
@@ -576,27 +859,21 @@ if project_notice:
     else:
         st.info(notice_text)
 
-with st.expander("Open a saved project", expanded=not st.session_state.loaded):
-    st.write(
-        "A saved project contains conformers, coordinates, populations, atom mappings, "
-        "distance criteria, settings, and the most recent analysis results."
-    )
+with st.expander(t("open_project"), expanded=False):
+    st.write(t("open_project_desc"))
     uploaded_project = st.file_uploader(
-        "Saved CDA project",
+        t("saved_project"),
         type=["zip"],
         key="saved_project_uploader",
     )
     confirm_project_replace = st.checkbox(
-        "Replace the current session with the uploaded project.",
+        t("replace_session"),
         key="confirm_project_replace",
     )
     if st.session_state.loaded:
-        st.warning(
-            "Loading a project replaces the conformers, mappings, criteria, settings, "
-            "and stored results currently open in this session."
-        )
+        st.warning(t("replace_warning"))
     if st.button(
-        "Upload saved project",
+        t("upload_project"),
         disabled=uploaded_project is None or not confirm_project_replace,
         type="primary",
         key="load_saved_project_button",
@@ -606,31 +883,33 @@ with st.expander("Open a saved project", expanded=not st.session_state.loaded):
             load_project_into_state(project_data)
             st.rerun()
         except Exception as exc:
-            st.error(f"Could not load the project: {exc}")
-
+            st.error(t("load_project_error", error=exc))
 
 # ==============================
 # Sidebar configuration
 # ==============================
-st.sidebar.header("Analysis settings")
+st.sidebar.header(t("analysis_settings"))
 col_min_dist, col_max_dist = st.sidebar.columns(2)
 minimum_distance = col_min_dist.number_input(
-    "Minimum distance (Å)",
+    t("minimum_distance"),
+    min_value=0.0,
     step=0.1,
     format="%.2f",
     key="analysis_minimum_distance",
 )
 maximum_distance = col_max_dist.number_input(
-    "Maximum distance (Å)",
+    t("maximum_distance"),
+    min_value=0.0,
     step=0.1,
     format="%.2f",
     key="analysis_maximum_distance",
 )
 distance_range_valid = float(minimum_distance) <= float(maximum_distance)
 if not distance_range_valid:
-    st.sidebar.error("Minimum distance must be less than or equal to maximum distance.")
+    st.sidebar.error(t("distance_error"))
+st.sidebar.caption(t("distance_note"))
 temperature = st.sidebar.number_input(
-    "Boltzmann temperature (K)",
+    t("temperature"),
     step=1.0,
     key="analysis_temperature",
 )
@@ -639,35 +918,41 @@ temperature = st.sidebar.number_input(
 # ==============================
 # Step 1: input mode
 # ==============================
-st.header("1. Input source")
-input_mode = st.radio("Choose input type", ["SDF ensemble", "Gaussian log files"], horizontal=True)
+st.header(t("input_source"))
+input_mode = st.radio(
+    t("choose_input"),
+    ["sdf", "gaussian"],
+    format_func=lambda x: t("sdf_ensemble") if x == "sdf" else t("gaussian_logs"),
+    horizontal=True,
+)
 
-if input_mode == "SDF ensemble":
-    st.subheader("Upload SDF ensembles")
-    st.write("Upload one or more multi-conformer SDF files. Each file is treated as one candidate ensemble.")
-    sdf_files = st.file_uploader("SDF files", type=["sdf"], accept_multiple_files=True)
-    default_group = st.text_input("Default group name", value="default_group")
+if input_mode == "sdf":
+    st.subheader(t("upload_sdf"))
+    st.write(t("upload_sdf_desc"))
+    sdf_files = st.file_uploader(t("sdf_files"), type=["sdf"], accept_multiple_files=True)
+    default_group = st.text_input(t("default_group"), value="default_group")
 
     if sdf_files:
+        file_col, group_col, candidate_col = t("col_file"), t("col_group"), t("col_candidate")
         mapping_df = pd.DataFrame(
             [
                 {
-                    "file_name": f.name,
-                    "group": default_group,
-                    "candidate": re.sub(r"\.sdf$", "", f.name, flags=re.I),
+                    file_col: f.name,
+                    group_col: default_group,
+                    candidate_col: re.sub(r"\.sdf$", "", f.name, flags=re.I),
                 }
                 for f in sdf_files
             ]
         )
-        edited = st.data_editor(mapping_df, num_rows="fixed", use_container_width=True, key="sdf_map")
-        if st.button("Load SDF ensembles"):
+        edited = st.data_editor(mapping_df, num_rows="fixed", use_container_width=True, key=f"sdf_map_{current_language()}")
+        if st.button(t("load_sdf")):
             all_records: List[ConformerRecord] = []
             for f in sdf_files:
-                matching = edited.loc[edited["file_name"] == f.name]
+                matching = edited.loc[edited[file_col] == f.name]
                 if matching.empty:
                     continue
                 row = matching.iloc[0]
-                recs = parse_sdf_ensemble(f, str(row["group"]), str(row["candidate"]))
+                recs = parse_sdf_ensemble(f, str(row[group_col]), str(row[candidate_col]))
                 all_records.extend(recs)
             all_records = compute_boltzmann_populations(all_records, temperature=temperature)
             st.session_state.records = all_records
@@ -681,13 +966,10 @@ if input_mode == "SDF ensemble":
             st.session_state.analysis_result_rows = []
             st.session_state.analysis_detail_rows = []
             st.session_state.analysis_skipped_messages = []
-            st.success(f"Loaded {len(all_records)} conformers from {len(sdf_files)} SDF file(s).")
+            st.success(t("loaded_sdf", count=len(all_records), files=len(sdf_files)))
 else:
-    st.subheader("Upload Gaussian log files")
-    st.write(
-        "Upload Gaussian log files in groups. After files are added to one group, "
-        "a new upload area can be added for the next group."
-    )
+    st.subheader(t("upload_gaussian"))
+    st.write(t("upload_gaussian_desc"))
 
     if "gaussian_group_count" not in st.session_state:
         st.session_state.gaussian_group_count = 1
@@ -699,12 +981,12 @@ else:
     for i in range(st.session_state.gaussian_group_count):
         with st.container(border=True):
             group_name = st.text_input(
-                f"Group {i + 1} name",
+                t("group_name", number=i + 1),
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i + 1}"),
                 key=f"gaussian_group_name_{i}",
             )
             files = st.file_uploader(
-                f"Gaussian log files for Group {i + 1}",
+                t("group_files", number=i + 1),
                 type=["log", "out"],
                 accept_multiple_files=True,
                 key=f"gaussian_group_files_{i}",
@@ -720,7 +1002,7 @@ else:
             )
 
     last_group_has_files = bool(group_specs and group_specs[-1]["files"])
-    if last_group_has_files and st.button("Add another Gaussian log group"):
+    if last_group_has_files and st.button(t("add_group")):
         st.session_state.gaussian_group_count += 1
         st.rerun()
 
@@ -736,12 +1018,12 @@ else:
                         "file_name": f.name,
                     }
                 )
-        st.markdown("#### Current assignments")
-        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
+        st.markdown(t("current_assignments"))
+        st.dataframe(pd.DataFrame(summary_rows).rename(columns={"group": t("col_group"), "candidate": t("col_candidate"), "file_name": t("col_file")}), use_container_width=True)
 
-    if st.button("Load Gaussian log files"):
+    if st.button(t("load_gaussian")):
         if not populated_groups:
-            st.error("Please upload at least one Gaussian log group.")
+            st.error(t("need_gaussian"))
         else:
             all_records: List[ConformerRecord] = []
             total_files = 0
@@ -762,17 +1044,19 @@ else:
             st.session_state.analysis_result_rows = []
             st.session_state.analysis_detail_rows = []
             st.session_state.analysis_skipped_messages = []
-            st.success(
-                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) "
-                f"across {len(populated_groups)} group(s)."
-            )
+            st.success(t(
+                "loaded_gaussian",
+                count=len(all_records),
+                files=total_files,
+                groups=len(populated_groups),
+            ))
 
 
 # ==============================
 # Loaded summary
 # ==============================
 if st.session_state.loaded and st.session_state.records:
-    st.header("2. Loaded conformers")
+    st.header(t("loaded_conformers"))
     recs: List[ConformerRecord] = st.session_state.records
     summary_df = pd.DataFrame([
         {
@@ -788,20 +1072,28 @@ if st.session_state.loaded and st.session_state.records:
         }
         for r in recs
     ])
-    st.dataframe(summary_df, use_container_width=True, height=280)
+    summary_display = summary_df.rename(columns={
+        "group": t("col_group"),
+        "candidate": t("col_candidate"),
+        "source": t("col_source"),
+        "conformer_id": t("col_conformer"),
+        "n_atoms": t("col_atoms"),
+        "energy": t("col_energy"),
+        "free_energy": t("col_free_energy"),
+        "population": t("col_population"),
+        "population_mode": t("col_population_mode"),
+    })
+    st.dataframe(summary_display, use_container_width=True, height=280)
 
     # ==============================
     # Step 3: intuitive atom mapping
     # ==============================
-    st.header("3. Atom mapping")
-    st.write(
-        "Choose a candidate, click one or more atoms in the 3D structure, assign a proton label, "
-        "and save the mapping. Multiple selected atoms are treated as an interchangeable group."
-    )
+    st.header(t("atom_mapping"))
+    st.write(t("atom_mapping_desc"))
 
     unique_candidates = sorted({(r.group, r.candidate) for r in recs})
     candidate_options = [f"{g} :: {c}" for g, c in unique_candidates]
-    selected_candidate = st.selectbox("Candidate for atom mapping", candidate_options)
+    selected_candidate = st.selectbox(t("candidate_mapping"), candidate_options)
     sel_group, sel_cand = selected_candidate.split(" :: ", 1)
     candidate_key = selected_candidate
     candidate_records = [r for r in recs if r.group == sel_group and r.candidate == sel_cand]
@@ -831,19 +1123,18 @@ if st.session_state.loaded and st.session_state.records:
 
     other_candidates = [option for option in candidate_options if option != candidate_key]
     if other_candidates:
-        with st.expander("Copy mappings between candidates", expanded=False):
-            st.caption(
-                "Mappings are copied once. After copying, each candidate can be edited independently."
-            )
+        with st.expander(t("copy_mappings"), expanded=False):
+            st.caption(t("copy_once"))
 
             copy_source = st.selectbox(
-                "Copy mapping from",
+                t("copy_from"),
                 other_candidates,
                 key=f"copy_source_{candidate_key}",
             )
             copy_mode = st.radio(
-                "Copy mode",
-                ["Labels and atom numbers", "Labels only"],
+                t("copy_mode"),
+                ["labels_atoms", "labels_only"],
+                format_func=lambda x: t(x),
                 horizontal=True,
                 key=f"copy_mode_{candidate_key}",
             )
@@ -852,63 +1143,49 @@ if st.session_state.loaded and st.session_state.records:
             source_example = candidate_examples[copy_source]
             numbering_compatible = atom_numbering_is_compatible(source_example, example)
 
-            if copy_mode == "Labels and atom numbers":
+            if copy_mode == "labels_atoms":
                 if numbering_compatible:
-                    st.success(
-                        "The source and destination have the same atom count and element order. "
-                        "Atom numbers can be copied."
-                    )
+                    st.success(t("compatible"))
                 else:
-                    st.warning(
-                        "The atom order differs between the source and destination. "
-                        "Use Labels only."
-                    )
+                    st.warning(t("incompatible"))
             else:
-                st.info(
-                    "Only the labels will be copied. Atom assignments will be left empty for this candidate."
-                )
+                st.info(t("labels_only_info"))
 
             if mappings_for_candidate:
-                st.caption(
-                    "Copying replaces all mappings currently registered for the selected destination candidate."
-                )
+                st.caption(t("copy_replace_note"))
 
             copy_disabled = (
                 not source_items
-                or (copy_mode == "Labels and atom numbers" and not numbering_compatible)
+                or (copy_mode == "labels_atoms" and not numbering_compatible)
             )
             if st.button(
-                "Copy mapping to this candidate",
+                t("copy_to_candidate"),
                 disabled=copy_disabled,
                 use_container_width=True,
                 key=f"copy_mapping_{candidate_key}",
             ):
-                include_atoms = copy_mode == "Labels and atom numbers"
+                include_atoms = copy_mode == "labels_atoms"
                 st.session_state.atom_mappings[candidate_key] = clone_mapping_items(
                     source_items,
                     include_atom_numbers=include_atoms,
                 )
                 st.session_state.mapping_selections[candidate_key] = []
-                detail = "labels and atom numbers" if include_atoms else "labels only"
+                detail = t("detail_labels_atoms") if include_atoms else t("detail_labels_only")
                 st.session_state.mapping_notice = (
                     "success",
-                    f"Copied {detail} from {copy_source} to {candidate_key}. "
-                    "The copied mapping is now independent.",
+                    t("copied_mapping", detail=detail, source=copy_source, destination=candidate_key),
                 )
                 st.rerun()
 
-            st.markdown("##### Apply the current mapping to all compatible candidates")
-            st.caption(
-                "This copies labels and atom numbers to candidates with the same atom count and element order. "
-                "Existing mappings in those candidates will be replaced."
-            )
+            st.markdown(t("apply_all"))
+            st.caption(t("apply_all_desc"))
             confirm_bulk = st.checkbox(
-                "I understand that existing mappings in compatible candidates will be replaced.",
+                t("confirm_replace"),
                 key=f"confirm_bulk_copy_{candidate_key}",
             )
             bulk_disabled = not mappings_for_candidate or not confirm_bulk
             if st.button(
-                "Apply current mapping to all compatible candidates",
+                t("apply_all_button"),
                 disabled=bulk_disabled,
                 use_container_width=True,
                 key=f"bulk_copy_mapping_{candidate_key}",
@@ -927,32 +1204,30 @@ if st.session_state.loaded and st.session_state.records:
                     else:
                         skipped_targets.append(target_key)
 
-                message = f"Copied the current mapping to {len(copied_targets)} compatible candidate(s)."
+                message = t("bulk_result", copied=len(copied_targets))
                 if skipped_targets:
-                    message += f" Skipped {len(skipped_targets)} candidate(s) with different atom ordering."
+                    message += t("bulk_skipped", skipped=len(skipped_targets))
                 st.session_state.mapping_notice = ("success", message)
                 st.rerun()
 
     left, right = st.columns([1.55, 1.0], gap="large")
 
     with left:
-        st.markdown("#### Click atoms in the 3D structure")
+        st.markdown(t("click_atoms"))
         picked_atoms = atom_picker(
             example.atoms,
             example.coords,
             selected_atoms=current_selection,
+            language=current_language(),
             key=f"atom_picker_{candidate_key}",
         )
         st.session_state.mapping_selections[candidate_key] = picked_atoms
         current_selection = picked_atoms
 
-        st.caption(
-            "Hydrogen atom numbers are shown by default. Use the checkboxes above the viewer "
-            "to display all atom numbers or to hide labels."
-        )
+        st.caption(t("viewer_caption"))
 
     with right:
-        st.markdown("#### New proton mapping")
+        st.markdown(t("new_mapping"))
 
         if current_selection:
             selected_details = [
@@ -960,50 +1235,51 @@ if st.session_state.loaded and st.session_state.records:
                 for number in current_selection
                 if 1 <= number <= len(example.atoms)
             ]
-            st.success("Selected: " + ", ".join(selected_details))
+            st.success(t("selected", items=", ".join(selected_details)))
         else:
-            st.info("No atom is selected yet.")
+            st.info(t("none_selected"))
 
         label_mode = st.radio(
-            "Label entry",
-            ["Build H label", "Free text"],
+            t("label_entry"),
+            ["build_label", "free_text"],
+            format_func=lambda x: t(x),
             horizontal=True,
             key=f"label_mode_{candidate_key}",
         )
 
-        if label_mode == "Build H label":
+        if label_mode == "build_label":
             label_col1, label_col2 = st.columns([1.2, 1.0])
             position = label_col1.text_input(
-                "Position number",
+                t("position_number"),
                 value="",
-                placeholder="e.g. 3",
+                placeholder=t("position_placeholder"),
                 key=f"position_{candidate_key}",
             ).strip()
             prime = label_col2.selectbox(
-                "Prime",
+                t("prime"),
                 ["", "′", "″", "‴"],
                 key=f"prime_{candidate_key}",
             )
             proposed_label = f"H-{position}{prime}" if position else ""
             if proposed_label:
-                st.markdown(f"Display label: **{proposed_label}**")
+                st.markdown(t("display_label", label=proposed_label))
         else:
             proposed_label = st.text_input(
-                "Label",
+                t("label"),
                 value="",
-                placeholder="e.g. H-2′ / H-6′",
+                placeholder=t("label_placeholder"),
                 key=f"custom_label_{candidate_key}",
             ).strip()
 
         button_col1, button_col2 = st.columns(2)
         save_mapping = button_col1.button(
-            "Save mapping",
+            t("save_mapping"),
             type="primary",
             use_container_width=True,
             key=f"save_mapping_{candidate_key}",
         )
         clear_selection = button_col2.button(
-            "Clear selection",
+            t("clear_selection"),
             use_container_width=True,
             key=f"clear_selection_{candidate_key}",
         )
@@ -1014,16 +1290,13 @@ if st.session_state.loaded and st.session_state.records:
 
         if save_mapping:
             if not proposed_label:
-                st.error("Enter a proton label.")
+                st.error(t("enter_label"))
             elif not current_selection:
-                st.error("Select at least one atom in the 3D structure.")
+                st.error(t("select_atom"))
             else:
                 non_h = [n for n in current_selection if example.atoms[n - 1] != "H"]
                 if non_h:
-                    st.error(
-                        "The following selected atoms are not hydrogen atoms: "
-                        + ", ".join(map(str, non_h))
-                    )
+                    st.error(t("non_hydrogen", atoms=", ".join(map(str, non_h))))
                 else:
                     atom_indices = [atom_index_from_user_number(n) for n in current_selection]
                     existing = next(
@@ -1038,22 +1311,22 @@ if st.session_state.loaded and st.session_state.records:
                                 "atom_indices": atom_indices,
                             }
                         )
-                        st.success(f"Added {proposed_label}.")
+                        st.success(t("added", label=proposed_label))
                     else:
                         existing["atom_numbers"] = list(current_selection)
                         existing["atom_indices"] = atom_indices
-                        st.success(f"Updated {proposed_label}.")
+                        st.success(t("updated", label=proposed_label))
                     st.session_state.mapping_selections[candidate_key] = []
                     st.rerun()
 
-        with st.expander("Manual selection fallback"):
-            st.caption("Use this only when clicking the 3D structure is difficult.")
+        with st.expander(t("manual_fallback")):
+            st.caption(t("manual_desc"))
             manual_raw = st.text_input(
-                "1-based atom numbers, separated by commas",
+                t("manual_numbers"),
                 value=",".join(map(str, current_selection)),
                 key=f"manual_selection_{candidate_key}",
             )
-            if st.button("Apply manual selection", key=f"apply_manual_{candidate_key}"):
+            if st.button(t("apply_manual"), key=f"apply_manual_{candidate_key}"):
                 try:
                     manual_numbers = sorted({
                         int(x.strip())
@@ -1062,32 +1335,32 @@ if st.session_state.loaded and st.session_state.records:
                     })
                     invalid = [n for n in manual_numbers if n < 1 or n > len(example.atoms)]
                     if invalid:
-                        st.error("Out-of-range atom numbers: " + ", ".join(map(str, invalid)))
+                        st.error(t("out_of_range", atoms=", ".join(map(str, invalid))))
                     else:
                         st.session_state.mapping_selections[candidate_key] = manual_numbers
                         st.rerun()
                 except ValueError:
-                    st.error("Enter integers separated by commas.")
+                    st.error(t("integer_error"))
 
-    st.markdown("#### Registered mappings for this candidate")
+    st.markdown(t("registered_mappings"))
     if not mappings_for_candidate:
-        st.info("No mappings have been registered for this candidate.")
+        st.info(t("no_mappings"))
     else:
         for idx, item in enumerate(list(mappings_for_candidate)):
             with st.container(border=True):
                 info_col, select_col, delete_col = st.columns([4.5, 1.5, 1.0])
                 atom_numbers = [int(n) for n in item.get("atom_numbers", [])]
-                atom_text = ", ".join(str(n) for n in atom_numbers) if atom_numbers else "Not assigned"
-                info_col.markdown(f"**{item['label']}**  \nAtom(s): {atom_text}")
+                atom_text = ", ".join(str(n) for n in atom_numbers) if atom_numbers else t("not_assigned")
+                info_col.markdown(f"**{item['label']}**  \n{t('atoms_label')}: {atom_text}")
                 if select_col.button(
-                    "Show/edit atoms",
+                    t("show_edit"),
                     key=f"show_mapping_{candidate_key}_{idx}",
                     use_container_width=True,
                 ):
                     st.session_state.mapping_selections[candidate_key] = list(item["atom_numbers"])
                     st.rerun()
                 if delete_col.button(
-                    "Delete",
+                    t("delete"),
                     key=f"delete_mapping_{candidate_key}_{idx}",
                     use_container_width=True,
                 ):
@@ -1100,32 +1373,38 @@ if st.session_state.loaded and st.session_state.records:
         candidate_mappings = st.session_state.atom_mappings.get(key, [])
         status_rows.append(
             {
-                "group": group,
-                "candidate": candidate,
-                "registered_labels": len(candidate_mappings),
-                "labels": ", ".join(str(x["label"]) for x in candidate_mappings),
+                t("col_group"): group,
+                t("col_candidate"): candidate,
+                t("col_registered"): len(candidate_mappings),
+                t("col_labels"): ", ".join(str(x["label"]) for x in candidate_mappings),
             }
         )
-    with st.expander("Mapping status for all candidates"):
+    with st.expander(t("mapping_status")):
         st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
 
     # ==============================
     # Step 4: criteria
     # ==============================
-    st.header("4. Distance criteria")
-    st.write(
-        "Enter the mapping labels to compare. The same criterion is applied to every candidate, "
-        "using that candidate's own atom mapping."
-    )
+    st.header(t("distance_criteria"))
+    st.write(t("criteria_desc"))
 
-    criteria_default = pd.DataFrame(
+    criteria_internal = pd.DataFrame(
         normalize_criteria_records(st.session_state.distance_criteria_records)
     )
-    criteria_df = st.data_editor(
+    criteria_column_map = {
+        "criterion": t("col_criterion"),
+        "proton_or_group_A": t("col_a"),
+        "proton_or_group_B": t("col_b"),
+    }
+    criteria_default = criteria_internal.rename(columns=criteria_column_map)
+    criteria_display_df = st.data_editor(
         criteria_default,
         num_rows="dynamic",
         use_container_width=True,
-        key=f"global_distance_criteria_{st.session_state.criteria_editor_revision}",
+        key=f"global_distance_criteria_{st.session_state.criteria_editor_revision}_{current_language()}",
+    )
+    criteria_df = criteria_display_df.rename(
+        columns={value: key for key, value in criteria_column_map.items()}
     )
     st.session_state.distance_criteria_records = normalize_criteria_records(
         criteria_df.fillna("").to_dict(orient="records")
@@ -1134,10 +1413,10 @@ if st.session_state.loaded and st.session_state.records:
     # ==============================
     # Step 5: analysis
     # ==============================
-    st.header("5. Analysis")
-    if st.button("Run distance analysis", type="primary"):
+    st.header(t("analysis"))
+    if st.button(t("run_analysis"), type="primary"):
         if not distance_range_valid:
-            st.error("Minimum distance must be less than or equal to maximum distance.")
+            st.error(t("distance_error"))
             st.stop()
 
         analysis_rows = []
@@ -1153,7 +1432,7 @@ if st.session_state.loaded and st.session_state.records:
                 active_criteria_rows.append((crit_label, a_label, b_label))
 
         if not active_criteria_rows:
-            st.error("Define at least one complete distance criterion.")
+            st.error(t("need_criterion"))
         else:
             candidate_groups = sorted({(r.group, r.candidate) for r in recs})
             for group, candidate in candidate_groups:
@@ -1173,8 +1452,9 @@ if st.session_state.loaded and st.session_state.records:
                     if label not in candidate_mapping or not candidate_mapping[label]
                 })
                 if missing_labels:
+                    missing_text = "未設定のマッピング" if current_language() == "ja" else "missing mapping(s)"
                     skipped_messages.append(
-                        f"{key}: missing mapping(s): {', '.join(missing_labels)}"
+                        f"{key}: {missing_text}: {', '.join(missing_labels)}"
                     )
                     continue
 
@@ -1264,65 +1544,89 @@ if st.session_state.loaded and st.session_state.records:
             else:
                 st.session_state.analysis_result_rows = []
                 st.session_state.analysis_detail_rows = []
-                st.warning("No analysis rows were generated. Check atom mappings and criteria.")
+                st.warning(t("no_analysis"))
 
     if st.session_state.analysis_skipped_messages:
-        st.warning(
-            "Some candidates were skipped:\n\n"
-            + "\n\n".join(st.session_state.analysis_skipped_messages)
-        )
+        st.warning(t(
+            "skipped",
+            messages="\n\n".join(st.session_state.analysis_skipped_messages),
+        ))
 
     if st.session_state.analysis_result_rows:
         result_df = pd.DataFrame(st.session_state.analysis_result_rows)
         detail_df = pd.DataFrame(st.session_state.analysis_detail_rows)
 
-        st.subheader("Candidate comparison")
-        st.dataframe(result_df, use_container_width=True)
+        result_rename = {
+            "group": t("col_group"),
+            "candidate": t("col_candidate"),
+            "minimum_distance_A": t("col_min"),
+            "maximum_distance_A": t("col_max"),
+            "all_criteria_same_conformer_population_sum": t("col_all_sum"),
+        }
+        for column in result_df.columns:
+            if column.startswith("population_sum::"):
+                result_rename[column] = f"{t('col_pop_sum_prefix')}::{column.split('::', 1)[1]}"
+        result_display = result_df.rename(columns=result_rename)
 
-        st.subheader("Per-conformer detail")
-        st.dataframe(detail_df, use_container_width=True, height=320)
+        detail_display = detail_df.rename(columns={
+            "group": t("col_group"),
+            "candidate": t("col_candidate"),
+            "conformer_id": t("col_conformer"),
+            "minimum_distance_A": t("col_min"),
+            "maximum_distance_A": t("col_max"),
+            "criterion": t("col_criterion"),
+            "mapping_A": t("col_a"),
+            "mapping_B": t("col_b"),
+            "distance_A": t("col_distance"),
+            "population_percent": t("col_population"),
+            "satisfies": t("col_satisfies"),
+        })
 
-        csv_result = result_df.to_csv(index=False).encode("utf-8-sig")
-        csv_detail = detail_df.to_csv(index=False).encode("utf-8-sig")
+        st.subheader(t("candidate_comparison"))
+        st.dataframe(result_display, use_container_width=True)
+
+        st.subheader(t("per_conformer"))
+        st.dataframe(detail_display, use_container_width=True, height=320)
+
+        csv_result = result_display.to_csv(index=False).encode("utf-8-sig")
+        csv_detail = detail_display.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
-            "Download candidate comparison CSV",
+            t("download_comparison"),
             csv_result,
             "candidate_comparison.csv",
             "text/csv",
         )
         st.download_button(
-            "Download per-conformer detail CSV",
+            t("download_detail"),
             csv_detail,
             "per_conformer_detail.csv",
             "text/csv",
         )
 
-    st.header("6. Save project")
-    st.write(
-        "Download the current analysis state to your computer. The saved project can later be "
-        "uploaded without re-entering atom labels or re-uploading the original SDF/log files."
-    )
-    st.text_input("Project name", key="project_name")
+    st.header(t("save_project"))
+    st.write(t("save_project_desc"))
+    st.text_input(t("project_name"), key="project_name")
     try:
         project_bytes = build_project_bytes()
         st.download_button(
-            "Download current project",
+            t("download_project"),
             data=project_bytes,
             file_name=safe_project_filename(st.session_state.project_name),
             mime="application/zip",
             type="primary",
             use_container_width=True,
         )
-        st.caption(
-            "The .cda.zip file contains coordinates, populations, mappings, criteria, settings, "
-            "and the most recent analysis results."
-        )
+        st.caption(t("project_contents"))
     except Exception as exc:
-        st.error(f"Could not prepare the project file: {exc}")
+        st.error(t("prepare_project_error", error=exc))
 
 
 st.markdown("---")
-st.caption(
-    "Tips: Use Gaussian logs when populations should be computed from electronic/free energies. "
-    "Use SDF when conformer populations or conformer-search energies are stored in the file."
-)
+st.caption(t("footer_tip"))
+st.caption(t(
+    "version_line",
+    app_version=APP_VERSION,
+    project_version=PROJECT_VERSION,
+))
+st.caption(t("author_line"))
+
