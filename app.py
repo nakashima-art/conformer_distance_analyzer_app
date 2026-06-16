@@ -248,15 +248,10 @@ st.caption("Streamlit tool for comparing conformer ensembles from SDF or Gaussia
 # Sidebar configuration
 # ==============================
 st.sidebar.header("Analysis settings")
-thresholds_text = st.sidebar.text_input("Distance thresholds (Å, comma-separated)", "3.0, 3.5")
-thresholds = []
-for x in thresholds_text.split(","):
-    try:
-        thresholds.append(float(x.strip()))
-    except Exception:
-        pass
-if not thresholds:
-    thresholds = [3.5]
+col_thr1, col_thr2 = st.sidebar.columns(2)
+threshold_1 = col_thr1.number_input("Threshold 1 (Å)", value=3.0, step=0.1, format="%.2f")
+threshold_2 = col_thr2.number_input("Threshold 2 (Å)", value=3.5, step=0.1, format="%.2f")
+thresholds = sorted({float(threshold_1), float(threshold_2)})
 
 temperature = st.sidebar.number_input("Boltzmann temperature (K)", value=298.15, step=1.0)
 
