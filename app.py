@@ -295,6 +295,29 @@ def min_between_groups(coords: np.ndarray, group_a: List[int], group_b: List[int
     return float(min(distances))
 
 
+def atom_numbering_is_compatible(source: ConformerRecord, destination: ConformerRecord) -> bool:
+    """Return True when 1-based atom numbers refer to the same element sequence."""
+    return source.atoms == destination.atoms
+
+
+def clone_mapping_items(
+    mapping_items: List[Dict[str, object]],
+    include_atom_numbers: bool,
+) -> List[Dict[str, object]]:
+    """Create an independent copy of mapping items for one-time copying."""
+    cloned: List[Dict[str, object]] = []
+    for item in mapping_items:
+        atom_numbers = [int(n) for n in item.get("atom_numbers", [])] if include_atom_numbers else []
+        cloned.append(
+            {
+                "label": str(item.get("label", "")),
+                "atom_numbers": atom_numbers,
+                "atom_indices": [atom_index_from_user_number(n) for n in atom_numbers],
+            }
+        )
+    return cloned
+
+
 # ==============================
 # App state helpers
 # ==============================
@@ -304,6 +327,7 @@ def init_state():
         "loaded": False,
         "atom_mappings": {},
         "mapping_selections": {},
+        "mapping_notice": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -492,6 +516,127 @@ if st.session_state.loaded and st.session_state.records:
     )
     current_selection = st.session_state.mapping_selections.get(candidate_key, [])
 
+    mapping_notice = st.session_state.pop("mapping_notice", None)
+    if mapping_notice:
+        notice_type, notice_text = mapping_notice
+        if notice_type == "success":
+            st.success(notice_text)
+        elif notice_type == "warning":
+            st.warning(notice_text)
+        else:
+            st.info(notice_text)
+
+    candidate_examples: Dict[str, ConformerRecord] = {}
+    for group, candidate in unique_candidates:
+        key = f"{group} :: {candidate}"
+        candidate_examples[key] = next(
+            r for r in recs if r.group == group and r.candidate == candidate
+        )
+
+    other_candidates = [option for option in candidate_options if option != candidate_key]
+    if other_candidates:
+        with st.expander("Copy mappings between candidates", expanded=False):
+            st.caption(
+                "Mappings are copied once. After copying, each candidate can be edited independently."
+            )
+
+            copy_source = st.selectbox(
+                "Copy mapping from",
+                other_candidates,
+                key=f"copy_source_{candidate_key}",
+            )
+            copy_mode = st.radio(
+                "Copy mode",
+                ["Labels and atom numbers", "Labels only"],
+                horizontal=True,
+                key=f"copy_mode_{candidate_key}",
+            )
+
+            source_items = st.session_state.atom_mappings.get(copy_source, [])
+            source_example = candidate_examples[copy_source]
+            numbering_compatible = atom_numbering_is_compatible(source_example, example)
+
+            if copy_mode == "Labels and atom numbers":
+                if numbering_compatible:
+                    st.success(
+                        "The source and destination have the same atom count and element order. "
+                        "Atom numbers can be copied."
+                    )
+                else:
+                    st.warning(
+                        "The atom order differs between the source and destination. "
+                        "Use Labels only."
+                    )
+            else:
+                st.info(
+                    "Only the labels will be copied. Atom assignments will be left empty for this candidate."
+                )
+
+            if mappings_for_candidate:
+                st.caption(
+                    "Copying replaces all mappings currently registered for the selected destination candidate."
+                )
+
+            copy_disabled = (
+                not source_items
+                or (copy_mode == "Labels and atom numbers" and not numbering_compatible)
+            )
+            if st.button(
+                "Copy mapping to this candidate",
+                disabled=copy_disabled,
+                use_container_width=True,
+                key=f"copy_mapping_{candidate_key}",
+            ):
+                include_atoms = copy_mode == "Labels and atom numbers"
+                st.session_state.atom_mappings[candidate_key] = clone_mapping_items(
+                    source_items,
+                    include_atom_numbers=include_atoms,
+                )
+                st.session_state.mapping_selections[candidate_key] = []
+                detail = "labels and atom numbers" if include_atoms else "labels only"
+                st.session_state.mapping_notice = (
+                    "success",
+                    f"Copied {detail} from {copy_source} to {candidate_key}. "
+                    "The copied mapping is now independent.",
+                )
+                st.rerun()
+
+            st.markdown("##### Apply the current mapping to all compatible candidates")
+            st.caption(
+                "This copies labels and atom numbers to candidates with the same atom count and element order. "
+                "Existing mappings in those candidates will be replaced."
+            )
+            confirm_bulk = st.checkbox(
+                "I understand that existing mappings in compatible candidates will be replaced.",
+                key=f"confirm_bulk_copy_{candidate_key}",
+            )
+            bulk_disabled = not mappings_for_candidate or not confirm_bulk
+            if st.button(
+                "Apply current mapping to all compatible candidates",
+                disabled=bulk_disabled,
+                use_container_width=True,
+                key=f"bulk_copy_mapping_{candidate_key}",
+            ):
+                copied_targets: List[str] = []
+                skipped_targets: List[str] = []
+                for target_key in other_candidates:
+                    target_example = candidate_examples[target_key]
+                    if atom_numbering_is_compatible(example, target_example):
+                        st.session_state.atom_mappings[target_key] = clone_mapping_items(
+                            mappings_for_candidate,
+                            include_atom_numbers=True,
+                        )
+                        st.session_state.mapping_selections[target_key] = []
+                        copied_targets.append(target_key)
+                    else:
+                        skipped_targets.append(target_key)
+
+                message = f"Copied the current mapping to {len(copied_targets)} compatible candidate(s)."
+                if skipped_targets:
+                    message += f" Skipped {len(skipped_targets)} candidate(s) with different atom ordering."
+                st.session_state.mapping_notice = ("success", message)
+                st.rerun()
+
     left, right = st.columns([1.55, 1.0], gap="large")
 
     with left:
@@ -635,7 +780,8 @@ if st.session_state.loaded and st.session_state.records:
         for idx, item in enumerate(list(mappings_for_candidate)):
             with st.container(border=True):
                 info_col, select_col, delete_col = st.columns([4.5, 1.5, 1.0])
-                atom_text = ", ".join(str(n) for n in item["atom_numbers"])
+                atom_numbers = [int(n) for n in item.get("atom_numbers", [])]
+                atom_text = ", ".join(str(n) for n in atom_numbers) if atom_numbers else "Not assigned"
                 info_col.markdown(f"**{item['label']}**  \nAtom(s): {atom_text}")
                 if select_col.button(
                     "Show/edit atoms",
@@ -725,7 +871,7 @@ if st.session_state.loaded and st.session_state.records:
                     label
                     for _, a_label, b_label in active_criteria_rows
                     for label in (a_label, b_label)
-                    if label not in candidate_mapping
+                    if label not in candidate_mapping or not candidate_mapping[label]
                 })
                 if missing_labels:
                     skipped_messages.append(
