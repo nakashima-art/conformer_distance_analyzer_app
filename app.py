@@ -189,102 +189,6 @@ def compute_boltzmann_populations(records: List[ConformerRecord], temperature: f
                 values.append(rec.energy)
                 mode = "energy"
             else:
-                values.append(None)
-
-        if any(v is None for v in values):
-            total = len(recs)
-            for rec in recs:
-                rec.population = 100.0 / total
-            continue
-
-        min_e = min(values)
-        deltas = [hartree_to_kcal(v - min_e) for v in values]
-        weights = [math.exp(-d / (r_kcal * temperature)) for d in deltas]
-        denom = sum(weights)
-        for rec, w in zip(recs, weights):
-            rec.population = 100.0 * w / denom
-            rec.metadata["population_mode"] = mode or "unknown"
-    return records
-
-
-# ==============================
-# Distance analysis
-# ==============================
-def atom_index_from_user_number(user_number: int) -> int:
-    # User enters 1-based atom numbers
-    return user_number - 1
-
-
-def pair_distance(coords: np.ndarray, idx_a: int, idx_b: int) -> float:
-    return float(np.linalg.norm(coords[idx_a] - coords[idx_b]))
-
-
-def min_group_distance(coords: np.ndarray, idx_a: int, idx_group: List[int]) -> float:
-    return float(min(pair_distance(coords, idx_a, j) for j in idx_group))
-
-
-# ==============================
-# App state helpers
-# ==============================
-def init_state():
-    defaults = {
-        "records": [],
-        "loaded": False,
-        "mapping_rows": [],
-        "criteria_rows": [],
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-
-
-init_state()
-
-st.title("Conformer Distance Analyzer")
-st.caption("Streamlit tool for comparing conformer ensembles from SDF or Gaussian log files using user-defined H···H distance criteria and conformer populations.")
-
-
-# ==============================
-# Sidebar configuration
-# ==============================
-st.sidebar.header("Analysis settings")
-col_thr1, col_thr2 = st.sidebar.columns(2)
-threshold_1 = col_thr1.number_input("Threshold 1 (Å)", value=3.0, step=0.1, format="%.2f")
-threshold_2 = col_thr2.number_input("Threshold 2 (Å)", value=3.5, step=0.1, format="%.2f")
-thresholds = sorted({float(threshold_1), float(threshold_2)})
-
-temperature = st.sidebar.number_input("Boltzmann temperature (K)", value=298.15, step=1.0)
-
-
-# ==============================
-# Step 1: input mode
-# ==============================
-st.header("1. Input source")
-input_mode = st.radio("Choose input type", ["SDF ensemble", "Gaussian log files"], horizontal=True)
-
-if input_mode == "SDF ensemble":
-    st.subheader("Upload SDF ensembles")
-    st.write("Upload one or more multi-conformer SDF files. Each file is treated as one candidate ensemble.")
-    sdf_files = st.file_uploader("SDF files", type=["sdf"], accept_multiple_files=True)
-    default_group = st.text_input("Default group name", value="default_group")
-
-    if sdf_files:
-        mapping_df = pd.DataFrame(
-            [{"file_name": f.name, "group": default_group, "candidate": re.sub(r"\.sdf$", "", f.name, flags=re.I)} for f in sdf_files]
-        )
-        edited = st.data_editor(mapping_df, num_rows="dynamic", use_container_width=True, key="sdf_map")
-        if st.button("Load SDF ensembles"):
-            all_records = []
-            for f in sdf_files:
-                row = edited.loc[edited["file_name"] == f.name].iloc[0]
-                recs = parse_sdf_ensemble(f, str(row["group"]), str(row["candidate"]))
-                all_records.extend(recs)
-            all_records = compute_boltzmann_populations(all_records, temperature=temperature)
-            st.session_state.records = all_records
-            st.session_state.loaded = True
-            st.success(f"Loaded {len(all_records)} conformers from {len(sdf_files)} SDF file(s).")
-
-else:
     st.subheader("Upload Gaussian log files")
     st.write("Upload Gaussian log files in groups. After files are added to one group, a new upload area appears for the next group.")
 
@@ -294,10 +198,10 @@ else:
         st.session_state.gaussian_group_specs = {}
 
     group_specs = []
-    all_uploaded_log_files = []
 
     for i in range(st.session_state.gaussian_group_count):
-        with st.container(border=True):            group_name = st.text_input(
+        with st.container(border=True):
+            group_name = st.text_input(
                 f"Group {i+1} name",
                 value=st.session_state.gaussian_group_specs.get(i, {}).get("group", f"Group {i+1}"),
                 key=f"gaussian_group_name_{i}",
@@ -308,19 +212,15 @@ else:
                 accept_multiple_files=True,
                 key=f"gaussian_group_files_{i}",
             )
-            if files:                st.session_state.gaussian_group_specs[i] = {
-                    "group": group_name,
-                }                group_specs.append({
-                    "group": group_name,
-                    "candidate": group_name,
-                    "files": files,
-                })
-                all_uploaded_log_files.extend(files)
-            else:                group_specs.append({
+
+            st.session_state.gaussian_group_specs[i] = {"group": group_name}
+            group_specs.append(
+                {
                     "group": group_name,
                     "candidate": group_name,
-                    "files": [],
-                })
+                    "files": files or [],
+                }
+            )
 
     last_group_has_files = bool(group_specs and group_specs[-1]["files"])
     if last_group_has_files:
@@ -333,11 +233,13 @@ else:
         summary_rows = []
         for g in populated_groups:
             for f in g["files"]:
-                summary_rows.append({
-                    "group": g["group"],
-                    "candidate": g["candidate"],
-                    "file_name": f.name,
-                })
+                summary_rows.append(
+                    {
+                        "group": g["group"],
+                        "candidate": g["candidate"],
+                        "file_name": f.name,
+                    }
+                )
         st.markdown("#### Current assignments")
         st.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
 
@@ -355,7 +257,9 @@ else:
             all_records = compute_boltzmann_populations(all_records, temperature=temperature)
             st.session_state.records = all_records
             st.session_state.loaded = True
-            st.success(f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) across {len(populated_groups)} group(s).")
+            st.success(
+                f"Loaded {len(all_records)} conformers from {total_files} Gaussian log file(s) across {len(populated_groups)} group(s)."
+            )
 
 
 # ==============================
